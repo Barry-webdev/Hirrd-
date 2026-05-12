@@ -264,7 +264,7 @@ export default function Events() {
           {/* Prix par catégorie */}
           <div>
             <p className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider mb-2">
-              Prix (FCFA)
+              Prix (GNF)
             </p>
             <div className="grid grid-cols-2 gap-2">
               {CATEGORIES.map((cat) => (

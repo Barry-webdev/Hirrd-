@@ -202,7 +202,7 @@ export default function Tickets() {
                       </Badge>
                     </td>
                     <td className="px-6 py-3 text-[var(--color-text)]">
-                      {t.prix ? `${t.prix.toLocaleString()} FCFA` : '—'}
+                      {t.prix ? `${t.prix.toLocaleString()} GNF` : '—'}
                     </td>
                     <td className="px-6 py-3">
                       {t.used ? (

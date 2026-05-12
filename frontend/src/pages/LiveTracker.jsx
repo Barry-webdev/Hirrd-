@@ -232,7 +232,7 @@ export default function LiveTracker() {
                       <p className="font-mono">{scanResult.ticket.numeroUnique}</p>
                       <p>
                         {scanResult.ticket.categorie?.toUpperCase()} —{' '}
-                        {scanResult.ticket.prix?.toLocaleString()} FCFA
+                        {scanResult.ticket.prix?.toLocaleString()} GNF
                       </p>
                     </div>
                   )}

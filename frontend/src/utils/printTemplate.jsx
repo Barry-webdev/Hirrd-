@@ -45,7 +45,7 @@ export default function PrintTemplate({ ticket, event }) {
           <strong>Catégorie :</strong> {ticket.categorie.toUpperCase()}
         </p>
         <p style={{ margin: '2px 0' }}>
-          <strong>Prix :</strong> {ticket.prix} FCFA
+          <strong>Prix :</strong> {ticket.prix} GNF
         </p>
       </div>
     </div>
