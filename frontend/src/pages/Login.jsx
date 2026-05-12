@@ -28,6 +28,7 @@ export default function Login() {
       'auth/invalid-email':       'Adresse email invalide.',
       'auth/too-many-requests':   'Trop de tentatives. Réessaie plus tard.',
       'auth/invalid-credential':  'Identifiants incorrects.',
+      'ACCESS_DENIED_ADMIN':      'Accès refusé. Ce compte n\'est pas un compte administrateur.',
     };
     return messages[code] ?? 'Une erreur est survenue. Réessaie.';
   };
@@ -38,10 +39,14 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      // Import dynamique pour éviter les dépendances circulaires
+      const { loginWithEmail } = await import('../firebase/auth');
+      
+      // Connexion avec vérification du rôle admin
+      await loginWithEmail(email, password, 'admin');
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(getErrorMessage(err.code));
+      setError(getErrorMessage(err.code || err.message));
     } finally {
       setSubmitting(false);
     }
