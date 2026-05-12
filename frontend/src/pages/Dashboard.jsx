@@ -1,0 +1,273 @@
+// Tableau de bord — statistiques globales en temps réel
+import { useState, useEffect } from 'react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { useAuth } from '../hooks/useAuth';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import {
+  CalendarDays, Ticket, Users, CheckCircle,
+  TrendingUp, Clock, AlertCircle,
+} from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, Cell,
+} from 'recharts';
+
+// Tooltip personnalisé pour le graphique
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm">
+      <p className="text-[var(--color-muted)] mb-1">{label}</p>
+      <p className="text-[var(--color-gold)] font-semibold">{payload[0].value} billets</p>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const { user } = useAuth();
+
+  const [stats, setStats]     = useState({
+    totalEvents: 0,
+    activeEvents: 0,
+    totalTickets: 0,
+    usedTickets: 0,
+    totalUsers: 0,
+    scanners: 0,
+  });
+  const [chartData, setChartData] = useState([]);
+  const [recentEvents, setRecentEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Chargement parallèle des collections
+        const [eventsSnap, ticketsSnap, usersSnap] = await Promise.all([
+          getDocs(collection(db, 'events')),
+          getDocs(collection(db, 'tickets')),
+          getDocs(collection(db, 'users')),
+        ]);
+
+        const events  = eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const tickets = ticketsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const users   = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        // Calcul des statistiques
+        const activeEvents = events.filter((e) => e.status === 'active').length;
+        const usedTickets  = tickets.filter((t) => t.used).length;
+        const scanners     = users.filter((u) => u.role === 'scanner').length;
+
+        setStats({
+          totalEvents:  events.length,
+          activeEvents,
+          totalTickets: tickets.length,
+          usedTickets,
+          totalUsers:   users.length,
+          scanners,
+        });
+
+        // Données du graphique — billets par événement (top 6)
+        const ticketsByEvent = {};
+        tickets.forEach((t) => {
+          ticketsByEvent[t.eventId] = (ticketsByEvent[t.eventId] || 0) + 1;
+        });
+
+        const chart = events
+          .slice(0, 6)
+          .map((e) => ({
+            nom:     e.nom?.length > 14 ? e.nom.slice(0, 14) + '…' : (e.nom ?? 'Sans nom'),
+            billets: ticketsByEvent[e.id] ?? 0,
+          }));
+        setChartData(chart);
+
+        // 4 événements les plus récents
+        const sorted = [...events].sort((a, b) => {
+          const da = a.date?.seconds ?? 0;
+          const db_ = b.date?.seconds ?? 0;
+          return db_ - da;
+        });
+        setRecentEvents(sorted.slice(0, 4));
+      } catch (err) {
+        console.error('Erreur chargement dashboard :', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+  }, []);
+
+  // Taux de scan
+  const scanRate = stats.totalTickets > 0
+    ? Math.round((stats.usedTickets / stats.totalTickets) * 100)
+    : 0;
+
+  // Badge couleur selon statut
+  const statusBadge = (status) => {
+    const map = { active: 'success', draft: 'muted', closed: 'danger' };
+    const labels = { active: 'Actif', draft: 'Brouillon', closed: 'Clôturé' };
+    return <Badge variant={map[status] ?? 'muted'}>{labels[status] ?? status}</Badge>;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-[var(--color-gold)] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* En-tête */}
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">
+          Bonjour 👋
+        </h1>
+        <p className="text-[var(--color-muted)] text-sm mt-1">
+          Voici un aperçu de l'activité Hirrdé
+        </p>
+      </div>
+
+      {/* Cartes de statistiques */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <StatCard
+          icon={CalendarDays}
+          label="Événements"
+          value={stats.totalEvents}
+          sub={`${stats.activeEvents} actif${stats.activeEvents > 1 ? 's' : ''}`}
+          subVariant="success"
+        />
+        <StatCard
+          icon={Ticket}
+          label="Billets émis"
+          value={stats.totalTickets}
+          sub={`${stats.usedTickets} scannés`}
+          subVariant="gold"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Taux de scan"
+          value={`${scanRate}%`}
+          sub={`${stats.totalTickets - stats.usedTickets} restants`}
+          subVariant="warning"
+        />
+        <StatCard
+          icon={Users}
+          label="Utilisateurs"
+          value={stats.totalUsers}
+          sub={`${stats.scanners} scanner${stats.scanners > 1 ? 's' : ''}`}
+          subVariant="muted"
+        />
+      </div>
+
+      {/* Graphique + événements récents */}
+      <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        {/* Graphique billets par événement */}
+        <Card className="xl:col-span-3">
+          <h3 className="text-sm font-semibold text-[var(--color-text)] mb-4">
+            Billets par événement
+          </h3>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chartData} barSize={28}>
+                <XAxis
+                  dataKey="nom"
+                  tick={{ fill: 'var(--color-muted)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fill: 'var(--color-muted)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={30}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(201,168,76,0.06)' }} />
+                <Bar dataKey="billets" radius={[4, 4, 0, 0]}>
+                  {chartData.map((_, i) => (
+                    <Cell
+                      key={i}
+                      fill={i === 0 ? 'var(--color-gold)' : 'var(--color-border)'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-[var(--color-muted)] text-sm">
+              Aucun événement à afficher
+            </div>
+          )}
+        </Card>
+
+        {/* Événements récents */}
+        <Card className="xl:col-span-2">
+          <h3 className="text-sm font-semibold text-[var(--color-text)] mb-4">
+            Événements récents
+          </h3>
+          {recentEvents.length > 0 ? (
+            <div className="space-y-3">
+              {recentEvents.map((ev) => (
+                <div
+                  key={ev.id}
+                  className="flex items-center justify-between py-2 border-b border-[var(--color-border)] last:border-0"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm text-[var(--color-text)] truncate font-medium">
+                      {ev.nom ?? 'Sans nom'}
+                    </p>
+                    <p className="text-xs text-[var(--color-muted)] mt-0.5 flex items-center gap-1">
+                      <Clock size={11} />
+                      {ev.date?.seconds
+                        ? new Date(ev.date.seconds * 1000).toLocaleDateString('fr-FR', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                          })
+                        : '—'}
+                    </p>
+                  </div>
+                  <div className="ml-3 shrink-0">{statusBadge(ev.status)}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-32 text-[var(--color-muted)] text-sm gap-2">
+              <AlertCircle size={20} />
+              Aucun événement
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// Composant carte de stat réutilisable
+function StatCard({ icon: Icon, label, value, sub, subVariant }) {
+  const subColors = {
+    success: 'text-[var(--color-success)]',
+    gold:    'text-[var(--color-gold)]',
+    warning: 'text-[var(--color-warning)]',
+    muted:   'text-[var(--color-muted)]',
+    danger:  'text-[var(--color-danger)]',
+  };
+
+  return (
+    <Card className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider">
+          {label}
+        </span>
+        <div className="w-8 h-8 rounded-lg bg-[var(--color-gold)]/10 flex items-center justify-center">
+          <Icon size={16} className="text-[var(--color-gold)]" />
+        </div>
+      </div>
+      <div>
+        <p className="text-3xl font-bold text-[var(--color-text)]">{value}</p>
+        <p className={`text-xs mt-1 ${subColors[subVariant] ?? subColors.muted}`}>{sub}</p>
+      </div>
+    </Card>
+  );
+}
