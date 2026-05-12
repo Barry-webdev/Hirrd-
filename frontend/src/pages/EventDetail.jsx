@@ -397,12 +397,17 @@ export default function EventDetail() {
                   )}
                 </div>
 
-                {/* Prix du billet + numéro */}
+                {/* Prix du billet + prévente + numéro */}
                 <div>
                   <p style={{ fontSize: 13, fontWeight: 800, color: '#c9a84c', margin: 0 }}>
                     {t.prix?.toLocaleString()} <span style={{ fontSize: 9, fontWeight: 600 }}>GNF</span>
                   </p>
-                  <p style={{ fontSize: 7.5, fontFamily: 'monospace', color: '#bbb', margin: '2px 0 0', letterSpacing: '0.4px' }}>
+                  {event?.prix?.prevente > 0 && t.categorie !== 'prevente' && (
+                    <p style={{ fontSize: 8, color: '#888', margin: '2px 0 0' }}>
+                      Prévente : {event.prix.prevente.toLocaleString()} GNF
+                    </p>
+                  )}
+                  <p style={{ fontSize: 7.5, fontFamily: 'monospace', color: '#bbb', margin: '3px 0 0', letterSpacing: '0.4px' }}>
                     {t.numeroUnique}
                   </p>
                 </div>
