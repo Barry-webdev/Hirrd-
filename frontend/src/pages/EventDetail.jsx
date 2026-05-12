@@ -397,20 +397,11 @@ export default function EventDetail() {
                   )}
                 </div>
 
-                {/* Prix prévente + jour J */}
+                {/* Prix du billet + numéro */}
                 <div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                    {event?.prix?.prevente > 0 && (
-                      <p style={{ fontSize: 9, color: '#666', margin: 0 }}>
-                        Prévente : <span style={{ fontWeight: 700, color: '#0a0a0a' }}>{event.prix.prevente.toLocaleString()} GNF</span>
-                      </p>
-                    )}
-                    {event?.prix?.[t.categorie] > 0 && (
-                      <p style={{ fontSize: 9, color: '#666', margin: 0 }}>
-                        Jour J : <span style={{ fontWeight: 800, color: '#c9a84c', fontSize: 11 }}>{event.prix[t.categorie].toLocaleString()} GNF</span>
-                      </p>
-                    )}
-                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: '#c9a84c', margin: 0 }}>
+                    {t.prix?.toLocaleString()} <span style={{ fontSize: 9, fontWeight: 600 }}>GNF</span>
+                  </p>
                   <p style={{ fontSize: 7.5, fontFamily: 'monospace', color: '#bbb', margin: '2px 0 0', letterSpacing: '0.4px' }}>
                     {t.numeroUnique}
                   </p>
