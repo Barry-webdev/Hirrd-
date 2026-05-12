@@ -17,7 +17,7 @@ import {
 const ROLE_VARIANTS = { admin: 'gold', scanner: 'muted' };
 const ROLE_ICONS    = { admin: Shield, scanner: ScanLine };
 
-const FORM_INIT = { nom: '', email: '', password: '', role: 'scanner', eventAssigned: '' };
+const FORM_INIT = { nom: '', email: '', password: '', role: 'scanner', eventAssigned: '', phoneNumber: '' };
 
 export default function Users() {
   const { role: currentRole } = useAuth();
@@ -73,6 +73,7 @@ export default function Users() {
       password:      '',
       role:          u.role ?? 'scanner',
       eventAssigned: u.eventAssigned ?? '',
+      phoneNumber:   u.phoneNumber ?? '',
     });
     setModalOpen(true);
   };
@@ -95,6 +96,17 @@ export default function Users() {
       return;
     }
 
+    // Validation du numéro de téléphone pour les scanners
+    if (form.role === 'scanner' && !form.phoneNumber.trim()) {
+      setFormError('Le numéro de téléphone est obligatoire pour les scanners.');
+      return;
+    }
+
+    if (form.role === 'scanner' && !form.phoneNumber.startsWith('+')) {
+      setFormError('Le numéro doit être au format international (ex: +33612345678).');
+      return;
+    }
+
     if (!editTarget && !form.password) {
       setFormError('Le mot de passe est obligatoire pour un nouveau compte.');
       return;
@@ -108,6 +120,7 @@ export default function Users() {
           nom:           form.nom.trim(),
           role:          form.role,
           eventAssigned: form.role === 'scanner' ? (form.eventAssigned || null) : null,
+          phoneNumber:   form.role === 'scanner' ? (form.phoneNumber.trim() || null) : null,
         });
       } else {
         // Création du compte Firebase Auth + profil Firestore
@@ -117,6 +130,7 @@ export default function Users() {
           email:         form.email.trim(),
           role:          form.role,
           eventAssigned: form.role === 'scanner' ? (form.eventAssigned || null) : null,
+          phoneNumber:   form.role === 'scanner' ? (form.phoneNumber.trim() || null) : null,
         });
       }
       setModalOpen(false);
@@ -237,7 +251,9 @@ export default function Users() {
                           <span className="text-[var(--color-text)] font-medium">{u.nom ?? '—'}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-3 text-[var(--color-muted)] text-xs">{u.email ?? '—'}</td>
+                      <td className="px-6 py-3 text-[var(--color-muted)] text-xs">
+                        {u.role === 'scanner' && u.phoneNumber ? u.phoneNumber : (u.email ?? '—')}
+                      </td>
                       <td className="px-6 py-3">
                         <Badge variant={ROLE_VARIANTS[u.role] ?? 'muted'}>
                           <RoleIcon size={11} className="mr-1" />
@@ -334,18 +350,34 @@ export default function Users() {
           </Field>
 
           {form.role === 'scanner' && (
-            <Field label="Événement assigné">
-              <select
-                value={form.eventAssigned}
-                onChange={(e) => setField('eventAssigned', e.target.value)}
-                className={inputCls}
-              >
-                <option value="">— Aucun —</option>
-                {events.map((ev) => (
-                  <option key={ev.id} value={ev.id}>{ev.nom}</option>
-                ))}
-              </select>
-            </Field>
+            <>
+              <Field label="Numéro de téléphone *">
+                <input
+                  type="tel"
+                  value={form.phoneNumber}
+                  onChange={(e) => setField('phoneNumber', e.target.value)}
+                  placeholder="+33612345678"
+                  className={inputCls}
+                  required
+                />
+                <p className="text-xs text-[var(--color-muted)] mt-1">
+                  Format international requis (ex: +33 pour la France)
+                </p>
+              </Field>
+              
+              <Field label="Événement assigné">
+                <select
+                  value={form.eventAssigned}
+                  onChange={(e) => setField('eventAssigned', e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="">— Aucun —</option>
+                  {events.map((ev) => (
+                    <option key={ev.id} value={ev.id}>{ev.nom}</option>
+                  ))}
+                </select>
+              </Field>
+            </>
           )}
 
           {formError && (

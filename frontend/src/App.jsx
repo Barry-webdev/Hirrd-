@@ -3,14 +3,15 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
 // Pages
-import Login       from './pages/Login';
-import Dashboard   from './pages/Dashboard';
-import Events      from './pages/Events';
-import EventDetail from './pages/EventDetail';
-import Tickets     from './pages/Tickets';
-import LiveTracker from './pages/LiveTracker';
-import Users       from './pages/Users';
-import Settings    from './pages/Settings';
+import Login        from './pages/Login';
+import Dashboard    from './pages/Dashboard';
+import Events       from './pages/Events';
+import EventDetail  from './pages/EventDetail';
+import Tickets      from './pages/Tickets';
+import LiveTracker  from './pages/LiveTracker';
+import Users        from './pages/Users';
+import Settings     from './pages/Settings';
+import MigrateUsers from './pages/MigrateUsers';
 
 // Layout protégé
 import Layout from './components/layout/Layout';
@@ -53,13 +54,14 @@ export default function App() {
         >
           {/* Redirection par défaut vers /dashboard */}
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"    element={<Dashboard />} />
-          <Route path="events"       element={<Events />} />
-          <Route path="events/:id"   element={<EventDetail />} />
-          <Route path="tickets"      element={<Tickets />} />
-          <Route path="live-tracker" element={<LiveTracker />} />
-          <Route path="users"        element={<Users />} />
-          <Route path="settings"     element={<Settings />} />
+          <Route path="dashboard"     element={<Dashboard />} />
+          <Route path="events"        element={<Events />} />
+          <Route path="events/:id"    element={<EventDetail />} />
+          <Route path="tickets"       element={<Tickets />} />
+          <Route path="live-tracker"  element={<LiveTracker />} />
+          <Route path="users"         element={<Users />} />
+          <Route path="settings"      element={<Settings />} />
+          <Route path="migrate-users" element={<MigrateUsers />} />
         </Route>
 
         {/* Toute route inconnue redirige vers /dashboard */}

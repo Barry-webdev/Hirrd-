@@ -23,10 +23,70 @@ export const getUserById = async (id) => {
 
 // Créer ou mettre à jour un profil utilisateur (utilisé après createAccount)
 export const setUserProfile = async (uid, data) => {
+  // Validation du rôle
+  const validRoles = ['admin', 'scanner'];
+  if (data.role && !validRoles.includes(data.role)) {
+    throw new Error('Rôle invalide. Utilisez "admin" ou "scanner".');
+  }
+  
   return setDoc(doc(db, COLLECTION, uid), {
     ...data,
+    role: data.role || 'scanner', // Par défaut : scanner
     createdAt: serverTimestamp(),
   });
+};
+
+// Créer un scanner avec numéro de téléphone (sans authentification Firebase)
+export const createScanner = async (data) => {
+  const { phoneNumber, name } = data;
+  
+  if (!phoneNumber || !name) {
+    throw new Error('Le numéro de téléphone et le nom sont requis.');
+  }
+  
+  // Vérifier si le numéro existe déjà
+  const existingScanner = await getScannerByPhone(phoneNumber);
+  if (existingScanner) {
+    throw new Error('Ce numéro de téléphone est déjà enregistré.');
+  }
+  
+  // Créer le document avec un ID auto-généré
+  const scannerRef = doc(collection(db, COLLECTION));
+  await setDoc(scannerRef, {
+    phoneNumber,
+    name,
+    role: 'scanner',
+    isActive: true,
+    createdAt: serverTimestamp(),
+  });
+  
+  return { id: scannerRef.id, phoneNumber, name, role: 'scanner' };
+};
+
+// Récupérer un scanner par son numéro de téléphone
+export const getScannerByPhone = async (phoneNumber) => {
+  const { query, where, getDocs } = await import('firebase/firestore');
+  const q = query(
+    collection(db, COLLECTION),
+    where('phoneNumber', '==', phoneNumber),
+    where('role', '==', 'scanner')
+  );
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) return null;
+  
+  const doc = snapshot.docs[0];
+  return { id: doc.id, ...doc.data() };
+};
+
+// Vérifier si un scanner est actif (pour les scanners créés via Users.jsx)
+export const isScannerActive = (scanner) => {
+  // Si le champ isActive existe, on l'utilise
+  if (scanner.hasOwnProperty('isActive')) {
+    return scanner.isActive === true;
+  }
+  // Sinon, on considère que le scanner est actif par défaut
+  return true;
 };
 
 // Mettre à jour un utilisateur existant
