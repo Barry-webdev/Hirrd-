@@ -18,6 +18,7 @@ import {
 
 const CATEGORIES = ['normal', 'prevente', 'vip', 'vvip'];
 const CAT_VARIANTS = { normal: 'muted', prevente: 'warning', vip: 'gold', vvip: 'success' };
+const CAT_COLORS   = { normal: '#6b6b6b', prevente: '#f59e0b', vip: '#c9a84c', vvip: '#22c55e' };
 
 export default function EventDetail() {
   const { id } = useParams();
@@ -260,21 +261,174 @@ export default function EventDetail() {
         )}
       </Card>
 
-      {/* Zone d'impression cachée */}
+      {/* Zone d'impression cachée — format ticket horizontal pro avec photo artiste */}
       <div className="hidden">
-        <div ref={printRef} className="p-4">
+        <div ref={printRef} style={{ padding: '8mm', background: '#f5f5f5' }}>
           {tickets.map((t) => (
-            <div key={t.id} className="mb-6 pb-6 border-b border-gray-200 last:border-0">
-              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 700 }}>
-                Hirr<span style={{ color: '#c9a84c' }}>dé</span>
-              </p>
-              <p style={{ fontSize: 13, fontWeight: 600 }}>{event?.nom}</p>
-              <p style={{ fontSize: 11, color: '#6b6b6b' }}>{event?.lieu}</p>
-              {t.qrCodeData && (
-                <QRCode value={t.qrCodeData} size={100} style={{ margin: '8px 0' }} />
-              )}
-              <p style={{ fontSize: 11, fontFamily: 'monospace' }}>{t.numeroUnique}</p>
-              <p style={{ fontSize: 11 }}>{t.categorie?.toUpperCase()} — {t.prix?.toLocaleString()} FCFA</p>
+            <div
+              key={t.id}
+              style={{
+                width: '180mm',
+                height: '60mm',
+                display: 'flex',
+                flexDirection: 'row',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                marginBottom: '6mm',
+                pageBreakInside: 'avoid',
+                fontFamily: "'DM Sans', Arial, sans-serif",
+                background: '#fff',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              }}
+            >
+              {/* ── ZONE 1 : Photo artiste (gauche) ── */}
+              <div style={{
+                width: '48mm',
+                flexShrink: 0,
+                position: 'relative',
+                overflow: 'hidden',
+                background: '#1a1a1a',
+              }}>
+                {event?.photoURL ? (
+                  <img
+                    src={event.photoURL}
+                    alt={event?.nom}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      display: 'block',
+                    }}
+                  />
+                ) : (
+                  /* Fallback si pas de photo — fond doré avec initiale */
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    background: 'linear-gradient(135deg, #c9a84c, #0a0a0a)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 28,
+                    fontWeight: 800,
+                    color: '#fff',
+                    fontFamily: "'Syne', Arial, sans-serif",
+                  }}>
+                    {event?.nom?.charAt(0)?.toUpperCase() ?? 'H'}
+                  </div>
+                )}
+                {/* Overlay dégradé sur la photo */}
+                <div style={{
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(to right, transparent 60%, rgba(255,255,255,0.15))',
+                }} />
+                {/* Badge catégorie sur la photo */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '3mm',
+                  left: '3mm',
+                  background: CAT_COLORS[t.categorie] ?? '#888',
+                  color: '#fff',
+                  fontSize: 7,
+                  fontWeight: 700,
+                  padding: '2px 6px',
+                  borderRadius: '3px',
+                  letterSpacing: '0.8px',
+                }}>
+                  {t.categorie?.toUpperCase()}
+                </div>
+              </div>
+
+              {/* ── ZONE 2 : Infos (centre) ── */}
+              <div style={{
+                flex: 1,
+                padding: '5mm 6mm',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                borderRight: '1px dashed #ddd',
+                overflow: 'hidden',
+              }}>
+                {/* Logo Hirrdé */}
+                <div>
+                  <p style={{
+                    fontFamily: "'Syne', Arial, sans-serif",
+                    fontSize: 13,
+                    fontWeight: 800,
+                    margin: 0,
+                    color: '#0a0a0a',
+                    letterSpacing: '-0.3px',
+                  }}>
+                    Hirr<span style={{ color: '#c9a84c' }}>dé</span>
+                  </p>
+                </div>
+
+                {/* Nom de l'événement */}
+                <div>
+                  <p style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    margin: 0,
+                    color: '#0a0a0a',
+                    lineHeight: 1.15,
+                    fontFamily: "'Syne', Arial, sans-serif",
+                    textTransform: 'uppercase',
+                    letterSpacing: '-0.2px',
+                  }}>
+                    {event?.nom}
+                  </p>
+                </div>
+
+                {/* Lieu + date */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  {event?.lieu && (
+                    <p style={{ fontSize: 9, color: '#444', margin: 0, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span>📍</span> {event.lieu}
+                    </p>
+                  )}
+                  {event?.date?.seconds && (
+                    <p style={{ fontSize: 9, color: '#444', margin: 0, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                      <span>📅</span> {new Date(event.date.seconds * 1000).toLocaleDateString('fr-FR', {
+                        day: '2-digit', month: 'long', year: 'numeric',
+                      })}
+                    </p>
+                  )}
+                </div>
+
+                {/* Prix + numéro */}
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: '#c9a84c', margin: 0 }}>
+                    {t.prix?.toLocaleString()} <span style={{ fontSize: 9, fontWeight: 600 }}>FCFA</span>
+                  </p>
+                  <p style={{ fontSize: 7.5, fontFamily: 'monospace', color: '#bbb', margin: '2px 0 0', letterSpacing: '0.4px' }}>
+                    {t.numeroUnique}
+                  </p>
+                </div>
+              </div>
+
+              {/* ── ZONE 3 : QR Code (droite) ── */}
+              <div style={{
+                width: '50mm',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '4mm',
+                gap: '4px',
+                background: '#fafafa',
+              }}>
+                {t.qrCodeData ? (
+                  <QRCode value={t.qrCodeData} size={118} level="H" />
+                ) : (
+                  <div style={{ width: 118, height: 118, background: '#eee', borderRadius: 4 }} />
+                )}
+                <p style={{ fontSize: 7, color: '#bbb', margin: 0, textAlign: 'center', letterSpacing: '0.3px' }}>
+                  Scanner à l'entrée
+                </p>
+              </div>
             </div>
           ))}
         </div>

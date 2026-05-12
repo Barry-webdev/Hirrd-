@@ -1,7 +1,7 @@
 // Page Billets — vue globale tous événements, filtres, recherche
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -27,11 +27,13 @@ export default function Tickets() {
       setError(null);
       try {
         const [ticketsSnap, eventsSnap] = await Promise.all([
-          getDocs(query(collection(db, 'tickets'), orderBy('createdAt', 'desc'))),
+          getDocs(collection(db, 'tickets')),
           getDocs(collection(db, 'events')),
         ]);
 
         const tks = ticketsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Tri côté client — cohérent avec tickets.js
+        tks.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
         const evMap = {};
         eventsSnap.docs.forEach((d) => { evMap[d.id] = d.data().nom ?? 'Sans nom'; });
 

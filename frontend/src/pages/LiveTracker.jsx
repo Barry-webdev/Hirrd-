@@ -1,6 +1,6 @@
 // Suivi en direct — scan QR code, validation billets en temps réel
 import { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { markTicketAsUsed } from '../firebase/tickets';
 import { parseQrCodeData } from '../utils/qrHelper';

@@ -3,7 +3,7 @@
 import {
   collection, doc, getDocs, getDoc,
   addDoc, updateDoc,
-  query, where, orderBy, serverTimestamp,
+  query, where, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './config';
 
@@ -14,10 +14,11 @@ export const getTicketsByEvent = async (eventId) => {
   const q = query(
     collection(db, COLLECTION),
     where('eventId', '==', eventId),
-    orderBy('createdAt', 'desc')
   );
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Tri côté client en attendant que l'index Firestore soit créé
+  const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return docs.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
 };
 
 // Récupérer un billet par son ID
