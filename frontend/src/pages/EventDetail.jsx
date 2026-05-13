@@ -261,155 +261,82 @@ export default function EventDetail() {
         )}
       </Card>
 
-      {/* Zone d'impression cachée — format ticket horizontal pro avec photo artiste */}
+      {/* Zone d'impression cachée — 6 tickets par page A4 (2 col × 3 lignes) */}
       <div className="hidden">
-        <div ref={printRef} style={{ padding: '6mm', background: '#fff' }}>
-          {/* Grille 2 colonnes × 3 lignes = 6 tickets par page A4 */}
+        <div ref={printRef}>
+          <style>{`
+            @page { size: A4 portrait; margin: 8mm; }
+            @media print { body { margin: 0; } }
+          `}</style>
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '4mm',
+            gap: '3mm',
+            width: '194mm',
+            height: '281mm',
+            boxSizing: 'border-box',
           }}>
-          {tickets.map((t) => (
-            <div
-              key={t.id}
-              style={{
-                width: '100%',
-                height: '44mm',
-                display: 'flex',
-                flexDirection: 'row',
-                borderRadius: '6px',
-                overflow: 'hidden',
-                pageBreakInside: 'avoid',
+            {tickets.map((t) => (
+              <div key={t.id} style={{
+                display: 'flex', flexDirection: 'row',
+                borderRadius: '5px', overflow: 'hidden',
                 fontFamily: "'DM Sans', Arial, sans-serif",
-                background: '#fff',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
-                border: '1px solid #e5e5e5',
-              }}
-            >
-              {/* ── ZONE 1 : Photo artiste (gauche) ── */}
-              <div style={{
-                width: '30mm',
-                flexShrink: 0,
-                position: 'relative',
-                overflow: 'hidden',
-                background: '#1a1a1a',
+                background: '#fff', border: '1px solid #e0e0e0',
+                boxSizing: 'border-box',
               }}>
-                {event?.photoURL ? (
-                  <img
-                    src={event.photoURL}
-                    alt={event?.nom}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                      objectPosition: 'center top',
-                      display: 'block',
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    background: 'linear-gradient(135deg, #c9a84c, #0a0a0a)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 20,
-                    fontWeight: 800,
-                    color: '#fff',
-                    fontFamily: "'Syne', Arial, sans-serif",
-                  }}>
-                    {event?.nom?.charAt(0)?.toUpperCase() ?? 'H'}
+                {/* Photo artiste */}
+                <div style={{ width: '28%', flexShrink: 0, position: 'relative', overflow: 'hidden', background: '#1a1a1a' }}>
+                  {event?.photoURL ? (
+                    <img src={event.photoURL} alt={event?.nom} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
+                  ) : (
+                    <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #c9a84c, #0a0a0a)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 800, color: '#fff', fontFamily: "'Syne', Arial, sans-serif" }}>
+                      {event?.nom?.charAt(0)?.toUpperCase() ?? 'H'}
+                    </div>
+                  )}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, transparent 55%, rgba(255,255,255,0.1))' }} />
+                  <div style={{ position: 'absolute', bottom: '2mm', left: '2mm', background: CAT_COLORS[t.categorie] ?? '#888', color: '#fff', fontSize: 6, fontWeight: 700, padding: '1px 4px', borderRadius: '2px', letterSpacing: '0.5px' }}>
+                    {t.categorie?.toUpperCase()}
                   </div>
-                )}
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'linear-gradient(to right, transparent 60%, rgba(255,255,255,0.15))',
-                }} />
-                <div style={{
-                  position: 'absolute',
-                  bottom: '2mm',
-                  left: '2mm',
-                  background: CAT_COLORS[t.categorie] ?? '#888',
-                  color: '#fff',
-                  fontSize: 6,
-                  fontWeight: 700,
-                  padding: '1px 4px',
-                  borderRadius: '2px',
-                  letterSpacing: '0.6px',
-                }}>
-                  {t.categorie?.toUpperCase()}
                 </div>
-              </div>
-
-              {/* ── ZONE 2 : Infos (centre) ── */}
-              <div style={{
-                flex: 1,
-                padding: '3mm 4mm',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                borderRight: '1px dashed #ddd',
-                overflow: 'hidden',
-              }}>
-                <p style={{ fontFamily: "'Syne', Arial, sans-serif", fontSize: 10, fontWeight: 800, margin: 0, color: '#0a0a0a' }}>
-                  Hirr<span style={{ color: '#c9a84c' }}>dé</span>
-                </p>
-                <p style={{ fontSize: 10, fontWeight: 800, margin: 0, color: '#0a0a0a', lineHeight: 1.15, fontFamily: "'Syne', Arial, sans-serif", textTransform: 'uppercase' }}>
-                  {event?.nom}
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  {event?.lieu && (
-                    <p style={{ fontSize: 7.5, color: '#444', margin: 0 }}>📍 {event.lieu}</p>
-                  )}
-                  {event?.date?.seconds && (
-                    <p style={{ fontSize: 7.5, color: '#444', margin: 0 }}>
-                      📅 {new Date(event.date.seconds * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 800, color: '#c9a84c', margin: 0 }}>
-                    {t.prix?.toLocaleString()} <span style={{ fontSize: 8, fontWeight: 600 }}>GNF</span>
+                {/* Infos */}
+                <div style={{ flex: 1, padding: '3mm 3mm', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', borderRight: '1px dashed #ccc', overflow: 'hidden', minWidth: 0 }}>
+                  <p style={{ fontFamily: "'Syne', Arial, sans-serif", fontSize: 9, fontWeight: 800, margin: 0, color: '#0a0a0a' }}>
+                    Hirr<span style={{ color: '#c9a84c' }}>dé</span>
                   </p>
-                  {event?.prix?.prevente > 0 && t.categorie !== 'prevente' && (
-                    <p style={{ fontSize: 7, color: '#888', margin: '1px 0 0' }}>
-                      Prévente : {event.prix.prevente.toLocaleString()} GNF
-                    </p>
-                  )}
-                  <p style={{ fontSize: 6.5, fontFamily: 'monospace', color: '#bbb', margin: '2px 0 0', letterSpacing: '0.3px' }}>
-                    {t.numeroUnique}
+                  <p style={{ fontSize: 8.5, fontWeight: 800, margin: 0, color: '#0a0a0a', lineHeight: 1.1, fontFamily: "'Syne', Arial, sans-serif", textTransform: 'uppercase', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {event?.nom}
                   </p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+                    {event?.lieu && <p style={{ fontSize: 7, color: '#555', margin: 0 }}>📍 {event.lieu}</p>}
+                    {event?.date?.seconds && (
+                      <p style={{ fontSize: 7, color: '#555', margin: 0 }}>
+                        📅 {new Date(event.date.seconds * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 10, fontWeight: 800, color: '#c9a84c', margin: 0 }}>
+                      {t.prix?.toLocaleString()} <span style={{ fontSize: 7, fontWeight: 600 }}>GNF</span>
+                    </p>
+                    {event?.prix?.prevente > 0 && t.categorie !== 'prevente' && (
+                      <p style={{ fontSize: 6.5, color: '#888', margin: '1px 0 0' }}>Prévente : {event.prix.prevente.toLocaleString()} GNF</p>
+                    )}
+                    <p style={{ fontSize: 6, fontFamily: 'monospace', color: '#bbb', margin: '2px 0 0', letterSpacing: '0.3px' }}>{t.numeroUnique}</p>
+                  </div>
+                </div>
+                {/* QR Code */}
+                <div style={{ width: '30%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2mm', gap: '2px', background: '#fafafa' }}>
+                  {t.qrCodeData
+                    ? <QRCode value={t.qrCodeData} size={72} level="H" />
+                    : <div style={{ width: 72, height: 72, background: '#eee', borderRadius: 3 }} />
+                  }
+                  <p style={{ fontSize: 5.5, color: '#bbb', margin: 0, textAlign: 'center' }}>Scanner à l'entrée</p>
                 </div>
               </div>
-
-              {/* ── ZONE 3 : QR Code (droite) ── */}
-              <div style={{
-                width: '38mm',
-                flexShrink: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '3mm',
-                gap: '3px',
-                background: '#fafafa',
-              }}>
-                {t.qrCodeData ? (
-                  <QRCode value={t.qrCodeData} size={88} level="H" />
-                ) : (
-                  <div style={{ width: 88, height: 88, background: '#eee', borderRadius: 3 }} />
-                )}
-                <p style={{ fontSize: 6, color: '#bbb', margin: 0, textAlign: 'center' }}>
-                  Scanner à l'entrée
-                </p>
-              </div>
-            </div>
-          ))}
+            ))}
           </div>
         </div>
+      </div>
 
       {/* Modal génération */}
       <Modal isOpen={genOpen} onClose={() => setGenOpen(false)} title="Générer des billets">
