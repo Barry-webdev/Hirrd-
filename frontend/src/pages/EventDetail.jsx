@@ -185,6 +185,43 @@ export default function EventDetail() {
         ))}
       </div>
 
+      {/* Recettes collectées */}
+      {(() => {
+        const totalCollecte    = tickets.filter((t) => t.used).reduce((s, t) => s + (t.prix ?? 0), 0);
+        const recettesParCat   = CATEGORIES.map((cat) => ({
+          cat,
+          montant: tickets.filter((t) => t.used && t.categorie === cat).reduce((s, t) => s + (t.prix ?? 0), 0),
+        })).filter((r) => r.montant > 0);
+
+        return (
+          <Card>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-[var(--color-text)]">
+                💰 Recettes collectées
+              </h3>
+              <span className="text-xl font-bold text-[var(--color-gold)]">
+                {totalCollecte.toLocaleString()} GNF
+              </span>
+            </div>
+            {recettesParCat.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {recettesParCat.map(({ cat, montant }) => (
+                  <div key={cat} className="bg-[var(--color-bg)] rounded-lg p-3 text-center">
+                    <Badge variant={CAT_VARIANTS[cat]}>{cat.toUpperCase()}</Badge>
+                    <p className="text-sm font-bold text-[var(--color-text)] mt-2">
+                      {montant.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-[var(--color-muted)]">GNF</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--color-muted)]">Aucun billet scanné pour l'instant.</p>
+            )}
+          </Card>
+        );
+      })()}
+
       {/* Tableau des billets */}
       <Card className="overflow-hidden p-0">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">

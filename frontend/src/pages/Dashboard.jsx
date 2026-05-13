@@ -7,7 +7,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import {
   CalendarDays, Ticket, Users, CheckCircle,
-  TrendingUp, Clock, AlertCircle,
+  TrendingUp, Clock, AlertCircle, Banknote,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -35,6 +35,7 @@ export default function Dashboard() {
     usedTickets: 0,
     totalUsers: 0,
     scanners: 0,
+    totalCollecte: 0,
   });
   const [chartData, setChartData] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
@@ -55,9 +56,13 @@ export default function Dashboard() {
         const users   = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
         // Calcul des statistiques
-        const activeEvents = events.filter((e) => e.status === 'active').length;
-        const usedTickets  = tickets.filter((t) => t.used).length;
-        const scanners     = users.filter((u) => u.role === 'scanner').length;
+        const activeEvents  = events.filter((e) => e.status === 'active').length;
+        const usedTickets   = tickets.filter((t) => t.used).length;
+        const scanners      = users.filter((u) => u.role === 'scanner').length;
+        // Montant total collecté = somme des prix des billets scannés
+        const totalCollecte = tickets
+          .filter((t) => t.used && t.prix)
+          .reduce((sum, t) => sum + (t.prix ?? 0), 0);
 
         setStats({
           totalEvents:  events.length,
@@ -66,6 +71,7 @@ export default function Dashboard() {
           usedTickets,
           totalUsers:   users.length,
           scanners,
+          totalCollecte,
         });
 
         // Données du graphique — billets par événement (top 6)
@@ -132,7 +138,7 @@ export default function Dashboard() {
       </div>
 
       {/* Cartes de statistiques */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
         <StatCard
           icon={CalendarDays}
           label="Événements"
@@ -153,6 +159,13 @@ export default function Dashboard() {
           value={`${scanRate}%`}
           sub={`${stats.totalTickets - stats.usedTickets} restants`}
           subVariant="warning"
+        />
+        <StatCard
+          icon={Banknote}
+          label="Recettes collectées"
+          value={`${stats.totalCollecte.toLocaleString()} GNF`}
+          sub={`sur ${stats.usedTickets} billets scannés`}
+          subVariant="success"
         />
         <StatCard
           icon={Users}
