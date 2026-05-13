@@ -1,7 +1,7 @@
 // Page Billets — vue globale tous événements, filtres, recherche
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -22,30 +22,37 @@ export default function Tickets() {
   const [usedFilter, setUsedFilter] = useState('tous'); // 'tous' | 'used' | 'unused'
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
+    const loadEvents = async () => {
       try {
-        const [ticketsSnap, eventsSnap] = await Promise.all([
-          getDocs(collection(db, 'tickets')),
-          getDocs(collection(db, 'events')),
-        ]);
-
-        const tks = ticketsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Tri côté client — cohérent avec tickets.js
-        tks.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        const eventsSnap = await getDocs(collection(db, 'events'));
         const evMap = {};
         eventsSnap.docs.forEach((d) => { evMap[d.id] = d.data().nom ?? 'Sans nom'; });
-
-        setTickets(tks);
         setEvents(evMap);
       } catch (err) {
-        setError(err.message ?? 'Erreur de chargement');
-      } finally {
-        setLoading(false);
+        console.error('Erreur chargement événements:', err);
       }
     };
-    load();
+
+    loadEvents();
+
+    // Listener en temps réel pour les tickets
+    const unsubscribe = onSnapshot(
+      collection(db, 'tickets'),
+      (snapshot) => {
+        const tks = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Tri côté client
+        tks.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        setTickets(tks);
+        setLoading(false);
+      },
+      (err) => {
+        setError(err.message ?? 'Erreur de chargement');
+        setLoading(false);
+      }
+    );
+
+    // Cleanup
+    return () => unsubscribe();
   }, []);
 
   // Filtrage
@@ -56,13 +63,13 @@ export default function Tickets() {
     const matchCat  = catFilter === 'tous' || t.categorie === catFilter;
     const matchUsed = usedFilter === 'tous'
       ? true
-      : usedFilter === 'used' ? t.used : !t.used;
+      : usedFilter === 'used' ? (t.used || t.status === 'validated') : (!t.used && t.status !== 'validated');
     return matchSearch && matchCat && matchUsed;
   });
 
   // Compteurs
   const total  = tickets.length;
-  const used   = tickets.filter((t) => t.used).length;
+  const used   = tickets.filter((t) => t.used || t.status === 'validated').length;
   const unused = total - used;
 
   if (loading) {
@@ -185,47 +192,50 @@ export default function Tickets() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg)] transition-colors"
-                  >
-                    <td className="px-6 py-3 font-mono text-xs text-[var(--color-text)]">
-                      {t.numeroUnique}
-                    </td>
-                    <td className="px-6 py-3 text-[var(--color-muted)] text-xs max-w-[160px] truncate">
-                      {events[t.eventId] ?? t.eventId}
-                    </td>
-                    <td className="px-6 py-3">
-                      <Badge variant={CAT_VARIANTS[t.categorie] ?? 'muted'}>
-                        {t.categorie?.toUpperCase()}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3 text-[var(--color-text)]">
-                      {t.prix ? `${t.prix.toLocaleString()} GNF` : '—'}
-                    </td>
-                    <td className="px-6 py-3">
-                      {t.used ? (
-                        <span className="flex items-center gap-1 text-[var(--color-success)] text-xs">
-                          <CheckCircle size={13} /> Scanné
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[var(--color-muted)] text-xs">
-                          <XCircle size={13} /> Valide
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3">
-                      <Link
-                        to={`/events/${t.eventId}`}
-                        className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors inline-flex"
-                        aria-label="Voir l'événement"
-                      >
-                        <ExternalLink size={14} />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map((t) => {
+                  const isValidated = t.used || t.status === 'validated';
+                  return (
+                    <tr
+                      key={t.id}
+                      className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg)] transition-colors"
+                    >
+                      <td className="px-6 py-3 font-mono text-xs text-[var(--color-text)]">
+                        {t.numeroUnique}
+                      </td>
+                      <td className="px-6 py-3 text-[var(--color-muted)] text-xs max-w-[160px] truncate">
+                        {events[t.eventId] ?? t.eventId}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Badge variant={CAT_VARIANTS[t.categorie] ?? 'muted'}>
+                          {t.categorie?.toUpperCase()}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-3 text-[var(--color-text)]">
+                        {t.prix ? `${t.prix.toLocaleString()} GNF` : '—'}
+                      </td>
+                      <td className="px-6 py-3">
+                        {isValidated ? (
+                          <span className="flex items-center gap-1 text-[var(--color-success)] text-xs">
+                            <CheckCircle size={13} /> Scanné
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[var(--color-muted)] text-xs">
+                            <XCircle size={13} /> Valide
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Link
+                          to={`/events/${t.eventId}`}
+                          className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors inline-flex"
+                          aria-label="Voir l'événement"
+                        >
+                          <ExternalLink size={14} />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

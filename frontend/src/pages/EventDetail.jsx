@@ -3,8 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useReactToPrint } from 'react-to-print';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { getEventById } from '../firebase/events';
-import { getTicketsByEvent, createTicket } from '../firebase/tickets';
+import { createTicket } from '../firebase/tickets';
 import { generateSerial } from '../utils/serialGenerator';
 import { generateQrCodeData } from '../utils/qrHelper';
 import Card from '../components/ui/Card';
@@ -38,29 +40,54 @@ export default function EventDetail() {
   // Modal QR code
   const [qrTicket, setQrTicket] = useState(null);
 
+  // Filtres
+  const [statusFilter, setStatusFilter] = useState('tous'); // 'tous' | 'scanned' | 'valid'
+
+  // Modal suppression
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Ref pour l'impression
   const printRef = useRef(null);
   const handlePrint = useReactToPrint({ contentRef: printRef });
 
-  // Chargement initial
+  // Chargement initial de l'événement
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError(null);
+    const loadEvent = async () => {
       try {
-        const [ev, tks] = await Promise.all([
-          getEventById(id),
-          getTicketsByEvent(id),
-        ]);
+        const ev = await getEventById(id);
         setEvent(ev);
-        setTickets(tks);
       } catch (err) {
         setError(err.message ?? 'Erreur de chargement');
-      } finally {
-        setLoading(false);
       }
     };
-    load();
+    loadEvent();
+  }, [id]);
+
+  // Listener en temps réel pour les tickets
+  useEffect(() => {
+    const q = query(
+      collection(db, 'tickets'),
+      where('eventId', '==', id)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const tks = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Tri côté client
+        tks.sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        setTickets(tks);
+        setLoading(false);
+      },
+      (err) => {
+        setError(err.message ?? 'Erreur de chargement des billets');
+        setLoading(false);
+      }
+    );
+
+    // Cleanup
+    return () => unsubscribe();
   }, [id]);
 
   // Génération de billets
@@ -74,7 +101,6 @@ export default function EventDetail() {
     }
     setGenerating(true);
     try {
-      const newTickets = [];
       for (let i = 0; i < qty; i++) {
         const numeroUnique = generateSerial();
         // On crée d'abord le doc pour obtenir l'ID, puis on met à jour qrCodeData
@@ -87,13 +113,10 @@ export default function EventDetail() {
         });
         const qrCodeData = generateQrCodeData(ref.id, id, numeroUnique);
         // Mise à jour du qrCodeData avec l'ID réel
-        const { updateDoc, doc } = await import('firebase/firestore');
-        const { db } = await import('../firebase/config');
         await updateDoc(doc(db, 'tickets', ref.id), { qrCodeData });
-        newTickets.push({ id: ref.id, eventId: id, numeroUnique, categorie: genCat, prix: event?.prix?.[genCat] ?? 0, qrCodeData, used: false });
       }
-      setTickets((prev) => [...newTickets, ...prev]);
       setGenOpen(false);
+      setGenQty(1);
     } catch (err) {
       setGenError(err.message ?? 'Erreur lors de la génération.');
     } finally {
@@ -101,12 +124,37 @@ export default function EventDetail() {
     }
   };
 
+  // Suppression de tous les billets
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      const { deleteDoc } = await import('firebase/firestore');
+      // Supprimer tous les tickets de cet événement
+      const deletePromises = tickets.map((t) => deleteDoc(doc(db, 'tickets', t.id)));
+      await Promise.all(deletePromises);
+      setDeleteOpen(false);
+    } catch (err) {
+      console.error('Erreur suppression:', err);
+      alert('Erreur lors de la suppression des billets');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // Statistiques par catégorie
   const statsByCat = CATEGORIES.map((cat) => {
     const total  = tickets.filter((t) => t.categorie === cat).length;
-    const used   = tickets.filter((t) => t.categorie === cat && t.used).length;
+    const used   = tickets.filter((t) => t.categorie === cat && (t.used || t.status === 'validated')).length;
     const quota  = event?.quotas?.[cat] ?? 0;
     return { cat, total, used, quota };
+  });
+
+  // Filtrage des tickets
+  const filteredTickets = tickets.filter((t) => {
+    const isValidated = t.used || t.status === 'validated';
+    if (statusFilter === 'scanned') return isValidated;
+    if (statusFilter === 'valid') return !isValidated;
+    return true; // 'tous'
   });
 
   if (loading) {
@@ -226,19 +274,44 @@ export default function EventDetail() {
       <Card className="overflow-hidden p-0">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
           <h3 className="font-semibold text-[var(--color-text)]">
-            Billets ({tickets.length})
+            Billets ({filteredTickets.length}{filteredTickets.length !== tickets.length ? ` / ${tickets.length}` : ''})
           </h3>
-          {tickets.length > 0 && (
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer size={14} /> Imprimer tout
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* Filtres statut */}
+            <div className="flex gap-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-1">
+              {[['tous', 'Tous'], ['scanned', 'Scannés'], ['valid', 'Valides']].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setStatusFilter(val)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    statusFilter === val
+                      ? 'bg-[var(--color-gold)] text-[var(--color-bg)]'
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {tickets.length > 0 && (
+              <>
+                <Button variant="outline" onClick={handlePrint}>
+                  <Printer size={14} /> Imprimer
+                </Button>
+                <Button variant="danger" onClick={() => setDeleteOpen(true)}>
+                  Supprimer tout
+                </Button>
+              </>
+            )}
+          </div>
         </div>
 
-        {tickets.length === 0 ? (
+        {filteredTickets.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-[var(--color-muted)]">
             <Ticket size={28} />
-            <p className="text-sm">Aucun billet généré</p>
+            <p className="text-sm">
+              {tickets.length === 0 ? 'Aucun billet généré' : 'Aucun billet dans ce filtre'}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -256,42 +329,45 @@ export default function EventDetail() {
                 </tr>
               </thead>
               <tbody>
-                {tickets.map((t) => (
-                  <tr
-                    key={t.id}
-                    className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg)] transition-colors"
-                  >
-                    <td className="px-6 py-3 font-mono text-xs text-[var(--color-text)]">
-                      {t.numeroUnique}
-                    </td>
-                    <td className="px-6 py-3">
-                      <Badge variant={CAT_VARIANTS[t.categorie]}>{t.categorie?.toUpperCase()}</Badge>
-                    </td>
-                    <td className="px-6 py-3 text-[var(--color-text)]">
-                      {t.prix ? `${t.prix.toLocaleString()} GNF` : '—'}
-                    </td>
-                    <td className="px-6 py-3">
-                      {t.used ? (
-                        <span className="flex items-center gap-1 text-[var(--color-success)] text-xs">
-                          <CheckCircle size={13} /> Scanné
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[var(--color-muted)] text-xs">
-                          <XCircle size={13} /> Non utilisé
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3">
-                      <button
-                        onClick={() => setQrTicket(t)}
-                        className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
-                        aria-label="Voir QR code"
-                      >
-                        <QrCode size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {filteredTickets.map((t) => {
+                  const isValidated = t.used || t.status === 'validated';
+                  return (
+                    <tr
+                      key={t.id}
+                      className="border-b border-[var(--color-border)] last:border-0 hover:bg-[var(--color-bg)] transition-colors"
+                    >
+                      <td className="px-6 py-3 font-mono text-xs text-[var(--color-text)]">
+                        {t.numeroUnique}
+                      </td>
+                      <td className="px-6 py-3">
+                        <Badge variant={CAT_VARIANTS[t.categorie]}>{t.categorie?.toUpperCase()}</Badge>
+                      </td>
+                      <td className="px-6 py-3 text-[var(--color-text)]">
+                        {t.prix ? `${t.prix.toLocaleString()} GNF` : '—'}
+                      </td>
+                      <td className="px-6 py-3">
+                        {isValidated ? (
+                          <span className="flex items-center gap-1 text-[var(--color-success)] text-xs">
+                            <CheckCircle size={13} /> Scanné
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[var(--color-muted)] text-xs">
+                            <XCircle size={13} /> Non utilisé
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
+                        <button
+                          onClick={() => setQrTicket(t)}
+                          className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                          aria-label="Voir QR code"
+                        >
+                          <QrCode size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -422,13 +498,43 @@ export default function EventDetail() {
             </div>
             <p className="font-mono text-sm text-[var(--color-text)]">{qrTicket.numeroUnique}</p>
             <Badge variant={CAT_VARIANTS[qrTicket.categorie]}>{qrTicket.categorie?.toUpperCase()}</Badge>
-            {qrTicket.used && (
+            {(qrTicket.used || qrTicket.status === 'validated') && (
               <p className="text-[var(--color-danger)] text-sm flex items-center gap-1">
                 <CheckCircle size={14} /> Ce billet a déjà été scanné
               </p>
             )}
           </div>
         )}
+      </Modal>
+
+      {/* Modal suppression */}
+      <Modal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} title="Supprimer tous les billets">
+        <div className="space-y-4">
+          <p className="text-sm text-[var(--color-text)]">
+            Êtes-vous sûr de vouloir supprimer <strong>tous les {tickets.length} billets</strong> de cet événement ?
+          </p>
+          <p className="text-sm text-[var(--color-danger)] bg-[var(--color-danger)]/10 border border-[var(--color-danger)]/20 rounded-lg px-3 py-2">
+            ⚠️ Cette action est irréversible
+          </p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="danger"
+              onClick={handleDeleteAll}
+              disabled={deleting}
+              className="flex-1 justify-center"
+            >
+              {deleting ? 'Suppression…' : 'Oui, supprimer tout'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleting}
+            >
+              Annuler
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

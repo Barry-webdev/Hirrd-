@@ -12,7 +12,7 @@ import LiveTracker  from './pages/LiveTracker';
 import Users        from './pages/Users';
 import Settings     from './pages/Settings';
 import Report       from './pages/Report';
-import MigrateUsers from './pages/MigrateUsers';
+// import MigrateUsers from './pages/MigrateUsers';
 
 // Layout protégé
 import Layout from './components/layout/Layout';
@@ -63,7 +63,7 @@ export default function App() {
           <Route path="users"         element={<Users />} />
           <Route path="settings"      element={<Settings />} />
           <Route path="report"        element={<Report />} />
-          <Route path="migrate-users" element={<MigrateUsers />} />
+          {/* <Route path="migrate-users" element={<MigrateUsers />} /> */}
         </Route>
 
         {/* Toute route inconnue redirige vers /dashboard */}

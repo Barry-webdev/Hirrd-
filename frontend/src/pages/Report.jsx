@@ -1,8 +1,7 @@
 // Page Rapport — résumé complet par événement
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { getTicketsByEvent } from '../firebase/tickets';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import {
@@ -62,26 +61,40 @@ export default function Report() {
   // Génération du rapport quand l'événement sélectionné change
   useEffect(() => {
     if (!selected) return;
-    const generate = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const event   = events.find((e) => e.id === selected);
-        const tickets = await getTicketsByEvent(selected);
+    
+    setLoading(true);
+    setError(null);
+
+    const event = events.find((e) => e.id === selected);
+    if (!event) {
+      setLoading(false);
+      return;
+    }
+
+    // Listener en temps réel pour les tickets de cet événement
+    const q = query(
+      collection(db, 'tickets'),
+      where('eventId', '==', selected)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const tickets = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 
         // Stats globales
         const totalBillets  = tickets.length;
-        const scannés       = tickets.filter((t) => t.used).length;
+        const scannés       = tickets.filter((t) => t.used || t.status === 'validated').length;
         const nonScannés    = totalBillets - scannés;
         const tauxScan      = totalBillets > 0 ? Math.round((scannés / totalBillets) * 100) : 0;
-        const totalCollecte = tickets.filter((t) => t.used).reduce((s, t) => s + (t.prix ?? 0), 0);
+        const totalCollecte = tickets.filter((t) => (t.used || t.status === 'validated')).reduce((s, t) => s + (t.prix ?? 0), 0);
         const totalEmis     = tickets.reduce((s, t) => s + (t.prix ?? 0), 0);
 
         // Stats par catégorie
         const parCategorie = CATEGORIES.map((cat) => {
           const tks        = tickets.filter((t) => t.categorie === cat);
-          const scannésCat = tks.filter((t) => t.used).length;
-          const collecté   = tks.filter((t) => t.used).reduce((s, t) => s + (t.prix ?? 0), 0);
+          const scannésCat = tks.filter((t) => t.used || t.status === 'validated').length;
+          const collecté   = tks.filter((t) => (t.used || t.status === 'validated')).reduce((s, t) => s + (t.prix ?? 0), 0);
           return {
             cat,
             total:    tks.length,
@@ -109,18 +122,25 @@ export default function Report() {
 
         // Historique des scans (10 derniers)
         const dernierScans = tickets
-          .filter((t) => t.used && t.usedAt)
-          .sort((a, b) => (b.usedAt?.seconds ?? 0) - (a.usedAt?.seconds ?? 0))
+          .filter((t) => (t.used || t.status === 'validated') && (t.usedAt || t.validatedAt))
+          .sort((a, b) => {
+            const timeA = (a.validatedAt?.seconds || a.usedAt?.seconds) ?? 0;
+            const timeB = (b.validatedAt?.seconds || b.usedAt?.seconds) ?? 0;
+            return timeB - timeA;
+          })
           .slice(0, 10);
 
         setReport({ event, totalBillets, scannés, nonScannés, tauxScan, totalCollecte, totalEmis, parCategorie, barData, pieData, dernierScans });
-      } catch (err) {
+        setLoading(false);
+      },
+      (err) => {
         setError(err.message ?? 'Erreur lors de la génération du rapport');
-      } finally {
         setLoading(false);
       }
-    };
-    generate();
+    );
+
+    // Cleanup
+    return () => unsubscribe();
   }, [selected, events]);
 
   if (loadingEvents) {
@@ -337,8 +357,8 @@ export default function Report() {
                     <div className="flex items-center gap-3">
                       <Badge variant={CAT_VARIANTS[t.categorie] ?? 'muted'}>{t.categorie?.toUpperCase()}</Badge>
                       <span className="text-xs text-[var(--color-muted)]">
-                        {t.usedAt?.seconds
-                          ? new Date(t.usedAt.seconds * 1000).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+                        {(t.validatedAt?.seconds || t.usedAt?.seconds)
+                          ? new Date((t.validatedAt?.seconds || t.usedAt?.seconds) * 1000).toLocaleString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
                           : '—'}
                       </span>
                     </div>

@@ -1,6 +1,6 @@
 // Tableau de bord — statistiques globales en temps réel
 import { useState, useEffect } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../hooks/useAuth';
 import Card from '../components/ui/Card';
@@ -37,42 +37,57 @@ export default function Dashboard() {
     scanners: 0,
     totalCollecte: 0,
   });
+  const [events, setEvents] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchEvents = async () => {
       try {
-        // Chargement parallèle des collections
-        const [eventsSnap, ticketsSnap, usersSnap] = await Promise.all([
-          getDocs(collection(db, 'events')),
-          getDocs(collection(db, 'tickets')),
-          getDocs(collection(db, 'users')),
-        ]);
+        const snap = await getDocs(collection(db, 'events'));
+        const evs  = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setEvents(evs);
+      } catch (err) {
+        console.error('Erreur chargement événements:', err);
+      }
+    };
 
-        const events  = eventsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const tickets = ticketsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const users   = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const fetchUsers = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        const usrs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setStats((prev) => ({
+          ...prev,
+          totalUsers: usrs.length,
+          scanners: usrs.filter((u) => u.role === 'scanner').length,
+        }));
+      } catch (err) {
+        console.error('Erreur chargement utilisateurs:', err);
+      }
+    };
 
+    fetchEvents();
+    fetchUsers();
+
+    // Listener en temps réel pour les tickets
+    const unsubscribe = onSnapshot(
+      collection(db, 'tickets'),
+      (snapshot) => {
+        const tickets = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        
         // Calcul des statistiques
-        const activeEvents  = events.filter((e) => e.status === 'active').length;
-        const usedTickets   = tickets.filter((t) => t.used).length;
-        const scanners      = users.filter((u) => u.role === 'scanner').length;
-        // Montant total collecté = somme des prix des billets scannés
+        const usedTickets = tickets.filter((t) => t.used || t.status === 'validated').length;
         const totalCollecte = tickets
-          .filter((t) => t.used && t.prix)
+          .filter((t) => (t.used || t.status === 'validated') && t.prix)
           .reduce((sum, t) => sum + (t.prix ?? 0), 0);
 
-        setStats({
-          totalEvents:  events.length,
-          activeEvents,
+        setStats((prev) => ({
+          ...prev,
           totalTickets: tickets.length,
           usedTickets,
-          totalUsers:   users.length,
-          scanners,
           totalCollecte,
-        });
+        }));
 
         // Données du graphique — billets par événement (top 6)
         const ticketsByEvent = {};
@@ -80,30 +95,48 @@ export default function Dashboard() {
           ticketsByEvent[t.eventId] = (ticketsByEvent[t.eventId] || 0) + 1;
         });
 
-        const chart = events
-          .slice(0, 6)
-          .map((e) => ({
-            nom:     e.nom?.length > 14 ? e.nom.slice(0, 14) + '…' : (e.nom ?? 'Sans nom'),
-            billets: ticketsByEvent[e.id] ?? 0,
-          }));
-        setChartData(chart);
-
-        // 4 événements les plus récents
-        const sorted = [...events].sort((a, b) => {
-          const da = a.date?.seconds ?? 0;
-          const db_ = b.date?.seconds ?? 0;
-          return db_ - da;
+        // On attend que events soit chargé
+        setChartData((prevChart) => {
+          if (events.length === 0) return prevChart;
+          return events
+            .slice(0, 6)
+            .map((e) => ({
+              nom:     e.nom?.length > 14 ? e.nom.slice(0, 14) + '…' : (e.nom ?? 'Sans nom'),
+              billets: ticketsByEvent[e.id] ?? 0,
+            }));
         });
-        setRecentEvents(sorted.slice(0, 4));
-      } catch (err) {
-        console.error('Erreur chargement dashboard :', err);
-      } finally {
+
+        setLoading(false);
+      },
+      (err) => {
+        console.error('Erreur listener tickets:', err);
         setLoading(false);
       }
-    };
+    );
 
-    fetchStats();
-  }, []);
+    // Cleanup
+    return () => unsubscribe();
+  }, [events.length]);
+
+  // Chargement des événements récents
+  useEffect(() => {
+    if (events.length === 0) return;
+    
+    const activeEvents = events.filter((e) => e.status === 'active').length;
+    setStats((prev) => ({
+      ...prev,
+      totalEvents: events.length,
+      activeEvents,
+    }));
+
+    // 4 événements les plus récents
+    const sorted = [...events].sort((a, b) => {
+      const da = a.date?.seconds ?? 0;
+      const db_ = b.date?.seconds ?? 0;
+      return db_ - da;
+    });
+    setRecentEvents(sorted.slice(0, 4));
+  }, [events]);
 
   // Taux de scan
   const scanRate = stats.totalTickets > 0
