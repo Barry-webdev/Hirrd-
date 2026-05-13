@@ -40,8 +40,6 @@ export default function Dashboard() {
   const [events, setEvents] = useState([]);
   const [chartData, setChartData] = useState([]);
   const [recentEvents, setRecentEvents] = useState([]);
-  const [recentScans, setRecentScans] = useState([]);
-  const [eventsMap, setEventsMap] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -50,10 +48,6 @@ export default function Dashboard() {
         const snap = await getDocs(collection(db, 'events'));
         const evs  = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setEvents(evs);
-        // Map id → nom pour afficher le nom de l'événement dans les scans
-        const map = {};
-        evs.forEach((e) => { map[e.id] = e.nom ?? 'Sans nom'; });
-        setEventsMap(map);
       } catch (err) {
         console.error('Erreur chargement événements:', err);
       }
@@ -94,13 +88,6 @@ export default function Dashboard() {
           usedTickets,
           totalCollecte,
         }));
-
-        // 15 derniers scans triés par heure de scan
-        const scans = tickets
-          .filter((t) => (t.used || t.status === 'validated') && t.usedAt)
-          .sort((a, b) => (b.usedAt?.seconds ?? 0) - (a.usedAt?.seconds ?? 0))
-          .slice(0, 15);
-        setRecentScans(scans);
 
         // Données du graphique — billets par événement (top 6)
         const ticketsByEvent = {};
@@ -299,51 +286,6 @@ export default function Dashboard() {
           )}
         </Card>
       </div>
-      {/* Derniers scans en temps réel */}
-      <Card>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-[var(--color-text)] flex items-center gap-2">
-            <CheckCircle size={15} className="text-[var(--color-success)]" />
-            Derniers scans
-          </h3>
-          <span className="text-xs text-[var(--color-muted)]">
-            {recentScans.length} affiché{recentScans.length > 1 ? 's' : ''}
-          </span>
-        </div>
-        {recentScans.length === 0 ? (
-          <p className="text-sm text-[var(--color-muted)] text-center py-6">Aucun scan pour l'instant</p>
-        ) : (
-          <div className="space-y-2">
-            {recentScans.map((t) => (
-              <div key={t.id} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-[var(--color-bg)]">
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={14} className="text-[var(--color-success)] shrink-0" />
-                  <div>
-                    <p className="font-mono text-xs text-[var(--color-text)]">{t.numeroUnique}</p>
-                    <p className="text-xs text-[var(--color-muted)] mt-0.5">
-                      {eventsMap[t.eventId] ?? '—'} · {t.scannedBy ?? 'scanner'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant={{ normal: 'muted', prevente: 'warning', vip: 'gold', vvip: 'success' }[t.categorie] ?? 'muted'}>
-                    {t.categorie?.toUpperCase()}
-                  </Badge>
-                  <span className="text-xs text-[var(--color-gold)] font-medium">
-                    {t.prix?.toLocaleString()} GNF
-                  </span>
-                  <span className="text-xs text-[var(--color-muted)]">
-                    {t.usedAt?.seconds
-                      ? new Date(t.usedAt.seconds * 1000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                      : '—'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
     </div>
   );
 }
