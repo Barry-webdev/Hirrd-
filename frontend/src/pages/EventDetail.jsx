@@ -271,9 +271,9 @@ export default function EventDetail() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
+            gridTemplateRows: 'repeat(3, 44mm)',
             gap: '3mm',
             width: '194mm',
-            height: '281mm',
             boxSizing: 'border-box',
           }}>
             {tickets.map((t) => (
@@ -283,6 +283,7 @@ export default function EventDetail() {
                 fontFamily: "'DM Sans', Arial, sans-serif",
                 background: '#fff', border: '1px solid #e0e0e0',
                 boxSizing: 'border-box',
+                height: '44mm',
               }}>
                 {/* Photo artiste */}
                 <div style={{ width: '28%', flexShrink: 0, position: 'relative', overflow: 'hidden', background: '#1a1a1a' }}>
