@@ -1,16 +1,13 @@
-// Suivi en direct — scan QR code, validation billets en temps réel
-import { useState, useEffect, useRef } from 'react';
+// Suivi en direct — monitoring des billets scannés en temps réel
+import { useState, useEffect } from 'react';
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { markTicketAsUsed } from '../firebase/tickets';
-import { parseQrCodeData } from '../utils/qrHelper';
 import { useAuth } from '../hooks/useAuth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import Button from '../components/ui/Button';
 import {
-  Radio, CheckCircle, XCircle, AlertCircle,
-  ScanLine, Clock, Ticket,
+  Radio, CheckCircle, AlertCircle,
+  Clock, Ticket, Smartphone,
 } from 'lucide-react';
 
 const CAT_VARIANTS = { normal: 'muted', prevente: 'warning', vip: 'gold', vvip: 'success' };
@@ -20,13 +17,8 @@ export default function LiveTracker() {
 
   const [events,       setEvents]       = useState([]);
   const [selectedEvent, setSelectedEvent] = useState('');
-  const [scanInput,    setScanInput]    = useState('');
-  const [scanning,     setScanning]     = useState(false);
-  const [scanResult,   setScanResult]   = useState(null); // { ok, message, ticket }
   const [recentScans,  setRecentScans]  = useState([]);
   const [liveStats,    setLiveStats]    = useState({ total: 0, used: 0 });
-
-  const inputRef = useRef(null);
 
   // Chargement des événements
   useEffect(() => {
@@ -65,12 +57,12 @@ export default function LiveTracker() {
 
     const unsub = onSnapshot(q, (snap) => {
       const tks = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const used = tks.filter((t) => t.used).length;
+      const used = tks.filter((t) => t.used || t.status === 'validated').length;
       setLiveStats({ total: tks.length, used });
 
       // 10 derniers scans
       const scanned = tks
-        .filter((t) => t.used && t.usedAt)
+        .filter((t) => (t.used || t.status === 'validated') && t.usedAt)
         .sort((a, b) => (b.usedAt?.seconds ?? 0) - (a.usedAt?.seconds ?? 0))
         .slice(0, 10);
       setRecentScans(scanned);
@@ -78,51 +70,6 @@ export default function LiveTracker() {
 
     return () => unsub();
   }, [selectedEvent]);
-
-  // Focus automatique sur le champ de scan
-  useEffect(() => {
-    if (selectedEvent) inputRef.current?.focus();
-  }, [selectedEvent]);
-
-  // Traitement du scan
-  const handleScan = async (e) => {
-    e.preventDefault();
-    const raw = scanInput.trim();
-    if (!raw) return;
-
-    setScanInput('');
-    setScanning(true);
-    setScanResult(null);
-
-    try {
-      // Tenter de parser le QR code
-      const parsed = parseQrCodeData(raw);
-      const ticketId = parsed?.ticketId ?? raw; // fallback : raw = ticketId direct
-
-      await markTicketAsUsed(ticketId, user?.email ?? 'scanner');
-
-      // Récupérer les infos du billet pour l'affichage
-      const { getTicketById } = await import('../firebase/tickets');
-      const ticket = await getTicketById(ticketId);
-
-      setScanResult({
-        ok: true,
-        message: 'Billet valide — accès autorisé',
-        ticket,
-      });
-    } catch (err) {
-      setScanResult({
-        ok: false,
-        message: err.message ?? 'Billet invalide',
-        ticket: null,
-      });
-    } finally {
-      setScanning(false);
-      // Effacer le résultat après 4 secondes
-      setTimeout(() => setScanResult(null), 4000);
-      inputRef.current?.focus();
-    }
-  };
 
   const scanRate = liveStats.total > 0
     ? Math.round((liveStats.used / liveStats.total) * 100)
@@ -135,11 +82,27 @@ export default function LiveTracker() {
         <div className="w-9 h-9 rounded-full bg-[var(--color-success)]/20 flex items-center justify-center">
           <Radio size={18} className="text-[var(--color-success)] animate-pulse" />
         </div>
-        <div>
-          <h1 className="text-2xl font-bold text-[var(--color-text)]">Suivi en direct</h1>
-          <p className="text-[var(--color-muted)] text-sm">Scan et validation des billets</p>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold text-[var(--color-text)]">Monitoring en direct</h1>
+          <p className="text-[var(--color-muted)] text-sm">Suivi des billets scannés en temps réel</p>
         </div>
       </div>
+
+      {/* Info app mobile */}
+      <Card className="bg-[var(--color-gold)]/10 border-[var(--color-gold)]/20">
+        <div className="flex items-start gap-3">
+          <Smartphone size={20} className="text-[var(--color-gold)] shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-[var(--color-text)]">
+              📱 Scan des billets via l'application mobile
+            </p>
+            <p className="text-xs text-[var(--color-muted)] mt-1">
+              Cette page affiche uniquement les statistiques en temps réel. 
+              Le scan des billets se fait via l'application mobile dédiée.
+            </p>
+          </div>
+        </div>
+      </Card>
 
       {/* Sélection de l'événement */}
       {events.length > 1 && (
@@ -188,58 +151,6 @@ export default function LiveTracker() {
               </div>
             </Card>
           </div>
-
-          {/* Zone de scan */}
-          <Card>
-            <h3 className="text-sm font-semibold text-[var(--color-text)] mb-4 flex items-center gap-2">
-              <ScanLine size={16} className="text-[var(--color-gold)]" />
-              Scanner un billet
-            </h3>
-
-            <form onSubmit={handleScan} className="flex gap-3">
-              <input
-                ref={inputRef}
-                type="text"
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                placeholder="Scanner le QR code ou saisir l'ID du billet…"
-                className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-sm text-[var(--color-text)] placeholder-[var(--color-muted)] focus:outline-none focus:border-[var(--color-gold)] transition-colors font-mono"
-                autoComplete="off"
-                disabled={scanning}
-              />
-              <Button type="submit" disabled={scanning || !scanInput.trim()}>
-                {scanning ? 'Vérification…' : 'Valider'}
-              </Button>
-            </form>
-
-            {/* Résultat du scan */}
-            {scanResult && (
-              <div
-                className={`mt-4 flex items-start gap-3 rounded-xl px-4 py-4 border transition-all ${
-                  scanResult.ok
-                    ? 'bg-[var(--color-success)]/10 border-[var(--color-success)]/30 text-[var(--color-success)]'
-                    : 'bg-[var(--color-danger)]/10 border-[var(--color-danger)]/30 text-[var(--color-danger)]'
-                }`}
-              >
-                {scanResult.ok
-                  ? <CheckCircle size={22} className="shrink-0 mt-0.5" />
-                  : <XCircle size={22} className="shrink-0 mt-0.5" />
-                }
-                <div>
-                  <p className="font-semibold">{scanResult.message}</p>
-                  {scanResult.ticket && (
-                    <div className="mt-1 space-y-0.5 text-sm opacity-80">
-                      <p className="font-mono">{scanResult.ticket.numeroUnique}</p>
-                      <p>
-                        {scanResult.ticket.categorie?.toUpperCase()} —{' '}
-                        {scanResult.ticket.prix?.toLocaleString()} GNF
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </Card>
 
           {/* Derniers scans */}
           <Card>

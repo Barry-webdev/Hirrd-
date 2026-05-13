@@ -28,7 +28,7 @@ export default function Sidebar() {
     { to: '/dashboard',    icon: LayoutDashboard, label: 'Tableau de bord' },
     { to: '/events',       icon: CalendarDays,    label: 'Événements' },
     { to: '/tickets',      icon: Ticket,          label: 'Billets' },
-    { to: '/live-tracker', icon: Radio,           label: 'Suivi en direct' },
+    // { to: '/live-tracker', icon: Radio,           label: 'Suivi en direct' }, // Masqué - scan via app mobile
     { to: '/report',       icon: FileBarChart2,   label: 'Rapports' },
     { to: '/users',        icon: Users,           label: 'Utilisateurs' },
     { to: '/settings',     icon: Settings,        label: 'Paramètres' },
