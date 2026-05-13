@@ -279,7 +279,7 @@ export default function EventDetail() {
             boxSizing: 'border-box',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gridTemplateRows: 'repeat(3, 1fr)',
+            gridTemplateRows: 'repeat(3, 160px)',
             gap: '10px',
             background: '#fff',
           }}>
@@ -333,8 +333,8 @@ export default function EventDetail() {
                 {/* QR Code */}
                 <div style={{ width: '90px', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '4px', gap: '2px', background: '#fafafa' }}>
                   {t.qrCodeData
-                    ? <QRCode value={t.qrCodeData} size={76} level="H" />
-                    : <div style={{ width: 76, height: 76, background: '#eee', borderRadius: 3 }} />
+                    ? <QRCode value={t.qrCodeData} size={58} level="H" />
+                    : <div style={{ width: 58, height: 58, background: '#eee', borderRadius: 3 }} />
                   }
                   <p style={{ fontSize: 6, color: '#bbb', margin: 0, textAlign: 'center' }}>Scanner à l'entrée</p>
                 </div>
