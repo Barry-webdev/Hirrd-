@@ -243,9 +243,12 @@ export default function Events() {
               type="url"
               value={form.photoURL}
               onChange={(e) => setField('photoURL', e.target.value)}
-              placeholder="https://…"
+              placeholder="https://example.com/image.jpg"
               className={inputCls}
             />
+            <p className="text-xs text-[var(--color-muted)] mt-1">
+              💡 Astuce : Upload ton image sur <a href="https://imgur.com" target="_blank" rel="noopener noreferrer" className="text-[var(--color-gold)] hover:underline">Imgur</a> ou <a href="https://imgbb.com" target="_blank" rel="noopener noreferrer" className="text-[var(--color-gold)] hover:underline">ImgBB</a> et colle l'URL ici
+            </p>
           </Field>
 
           {/* Statut */}

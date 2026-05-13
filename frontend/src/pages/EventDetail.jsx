@@ -42,6 +42,7 @@ export default function EventDetail() {
 
   // Filtres
   const [statusFilter, setStatusFilter] = useState('tous'); // 'tous' | 'scanned' | 'valid'
+  const [categoryFilter, setCategoryFilter] = useState('tous'); // 'tous' | 'normal' | 'prevente' | 'vip' | 'vvip'
 
   // Modal suppression
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -149,12 +150,25 @@ export default function EventDetail() {
     return { cat, total, used, quota };
   });
 
+  // Statistiques globales
+  const totalTickets = tickets.length;
+  const scannedTickets = tickets.filter((t) => t.used || t.status === 'validated').length;
+  const recettesCollectees = tickets
+    .filter((t) => (t.used || t.status === 'validated') && t.prix)
+    .reduce((sum, t) => sum + (t.prix ?? 0), 0);
+
   // Filtrage des tickets
   const filteredTickets = tickets.filter((t) => {
     const isValidated = t.used || t.status === 'validated';
-    if (statusFilter === 'scanned') return isValidated;
-    if (statusFilter === 'valid') return !isValidated;
-    return true; // 'tous'
+    
+    // Filtre par statut
+    if (statusFilter === 'scanned' && !isValidated) return false;
+    if (statusFilter === 'valid' && isValidated) return false;
+    
+    // Filtre par catégorie
+    if (categoryFilter !== 'tous' && t.categorie !== categoryFilter) return false;
+    
+    return true;
   });
 
   if (loading) {
@@ -235,10 +249,10 @@ export default function EventDetail() {
 
       {/* Recettes collectées */}
       {(() => {
-        const totalCollecte    = tickets.filter((t) => t.used).reduce((s, t) => s + (t.prix ?? 0), 0);
+        const totalCollecte    = tickets.filter((t) => t.used || t.status === 'validated').reduce((s, t) => s + (t.prix ?? 0), 0);
         const recettesParCat   = CATEGORIES.map((cat) => ({
           cat,
-          montant: tickets.filter((t) => t.used && t.categorie === cat).reduce((s, t) => s + (t.prix ?? 0), 0),
+          montant: tickets.filter((t) => (t.used || t.status === 'validated') && t.categorie === cat).reduce((s, t) => s + (t.prix ?? 0), 0),
         })).filter((r) => r.montant > 0);
 
         return (
@@ -272,12 +286,39 @@ export default function EventDetail() {
 
       {/* Tableau des billets */}
       <Card className="overflow-hidden p-0">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] flex-wrap gap-3">
           <h3 className="font-semibold text-[var(--color-text)]">
             Billets ({filteredTickets.length}{filteredTickets.length !== tickets.length ? ` / ${tickets.length}` : ''})
           </h3>
-          <div className="flex items-center gap-2">
-            {/* Filtres statut */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Filtre catégorie */}
+            <div className="flex gap-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-1">
+              <button
+                onClick={() => setCategoryFilter('tous')}
+                className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                  categoryFilter === 'tous'
+                    ? 'bg-[var(--color-gold)] text-[var(--color-bg)]'
+                    : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                Tous
+              </button>
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={`px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                    categoryFilter === cat
+                      ? 'bg-[var(--color-gold)] text-[var(--color-bg)]'
+                      : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'
+                  }`}
+                >
+                  {cat.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            {/* Filtre statut */}
             <div className="flex gap-1 bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg p-1">
               {[['tous', 'Tous'], ['scanned', 'Scannés'], ['valid', 'Valides']].map(([val, label]) => (
                 <button
@@ -382,7 +423,7 @@ export default function EventDetail() {
             @media print { body { margin: 0; } }
           `}</style>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2mm' }}>
-            {tickets.map((t) => (
+            {filteredTickets.map((t) => (
               <div key={t.id} style={{
                 display: 'flex', flexDirection: 'row',
                 width: '200mm',
