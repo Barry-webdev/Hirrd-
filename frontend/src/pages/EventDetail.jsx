@@ -279,7 +279,7 @@ export default function EventDetail() {
             boxSizing: 'border-box',
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gridTemplateRows: 'repeat(3, 160px)',
+            gridTemplateRows: 'repeat(3, 120px)',
             gap: '10px',
             background: '#fff',
           }}>
@@ -309,7 +309,7 @@ export default function EventDetail() {
                   <p style={{ fontFamily: "'Syne', Arial, sans-serif", fontSize: 9, fontWeight: 800, margin: 0, color: '#0a0a0a' }}>
                     Hirr<span style={{ color: '#c9a84c' }}>dé</span>
                   </p>
-                  <p style={{ fontSize: 9, fontWeight: 800, margin: 0, color: '#0a0a0a', lineHeight: 1.1, textTransform: 'uppercase', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+                  <p style={{ fontSize: 7, fontWeight: 800, margin: 0, color: '#0a0a0a', lineHeight: 1.1, textTransform: 'uppercase', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
                     {event?.nom}
                   </p>
                   <div>
