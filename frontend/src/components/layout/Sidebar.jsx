@@ -7,7 +7,8 @@ import {
   Radio, 
   Users, 
   Settings, 
-  LogOut 
+  LogOut,
+  FileBarChart2,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
@@ -28,6 +29,7 @@ export default function Sidebar() {
     { to: '/events',       icon: CalendarDays,    label: 'Événements' },
     { to: '/tickets',      icon: Ticket,          label: 'Billets' },
     { to: '/live-tracker', icon: Radio,           label: 'Suivi en direct' },
+    { to: '/report',       icon: FileBarChart2,   label: 'Rapports' },
     { to: '/users',        icon: Users,           label: 'Utilisateurs' },
     { to: '/settings',     icon: Settings,        label: 'Paramètres' },
   ];

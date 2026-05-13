@@ -11,6 +11,7 @@ import Tickets      from './pages/Tickets';
 import LiveTracker  from './pages/LiveTracker';
 import Users        from './pages/Users';
 import Settings     from './pages/Settings';
+import Report       from './pages/Report';
 import MigrateUsers from './pages/MigrateUsers';
 
 // Layout protégé
@@ -61,6 +62,7 @@ export default function App() {
           <Route path="live-tracker"  element={<LiveTracker />} />
           <Route path="users"         element={<Users />} />
           <Route path="settings"      element={<Settings />} />
+          <Route path="report"        element={<Report />} />
           <Route path="migrate-users" element={<MigrateUsers />} />
         </Route>
 
