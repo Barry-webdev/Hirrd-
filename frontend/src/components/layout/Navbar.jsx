@@ -1,6 +1,8 @@
-// Barre de navigation supérieure — titre de page + infos utilisateur
+// Barre de navigation supérieure — titre de page + infos utilisateur + toggle thème
 import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useTheme } from '../../contexts/ThemeContext';
+import { Sun, Moon } from 'lucide-react';
 
 // Correspondance chemin → titre de page
 const PAGE_TITLES = {
@@ -8,6 +10,7 @@ const PAGE_TITLES = {
   '/events':       'Événements',
   '/tickets':      'Billets',
   '/live-tracker': 'Suivi en direct',
+  '/report':       'Rapports',
   '/users':        'Utilisateurs',
   '/settings':     'Paramètres',
 };
@@ -19,8 +22,9 @@ const ROLE_STYLES = {
 };
 
 export default function Navbar() {
-  const location      = useLocation();
+  const location       = useLocation();
   const { user, role } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   // Titre de la page courante (gère aussi /events/:id)
   const rawPath  = location.pathname;
@@ -43,6 +47,17 @@ export default function Navbar() {
 
       {/* Infos utilisateur à droite */}
       <div className="flex items-center gap-3">
+
+        {/* Toggle thème dark / light */}
+        <button
+          onClick={toggleTheme}
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors"
+          aria-label={theme === 'dark' ? 'Passer en mode clair' : 'Passer en mode sombre'}
+          title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+        >
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+
         {/* Badge de rôle */}
         {role && (
           <span
