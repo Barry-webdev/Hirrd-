@@ -16,6 +16,7 @@ export default function Login() {
 
   // Redirection automatique si déjà connecté
   if (!loading && user) {
+    // Redirection selon le rôle (sera géré par useAuth)
     navigate('/dashboard', { replace: true });
     return null;
   }
@@ -39,12 +40,22 @@ export default function Login() {
     setSubmitting(true);
 
     try {
-      // Import dynamique pour éviter les dépendances circulaires
-      const { loginWithEmail } = await import('../firebase/auth');
+      // Connexion simple sans vérification de rôle
+      await signInWithEmailAndPassword(auth, email, password);
       
-      // Connexion avec vérification du rôle admin
-      await loginWithEmail(email, password, 'admin');
-      navigate('/dashboard', { replace: true });
+      // Récupérer le rôle de l'utilisateur
+      const { getUserById } = await import('../firebase/users');
+      const userProfile = await getUserById(auth.currentUser.uid);
+      
+      // Redirection selon le rôle
+      if (userProfile.role === 'owner') {
+        navigate('/owner-dashboard', { replace: true });
+      } else if (userProfile.role === 'scanner') {
+        navigate('/settings', { replace: true });
+      } else {
+        // admin ou autre
+        navigate('/dashboard', { replace: true });
+      }
     } catch (err) {
       setError(getErrorMessage(err.code || err.message));
     } finally {
@@ -61,7 +72,7 @@ export default function Login() {
             Hirr<span className="text-[var(--color-gold)]">dé</span>
           </h1>
           <p className="text-[var(--color-muted)] text-sm">
-            Panneau d'administration
+            Connexion au système
           </p>
         </div>
 
@@ -85,7 +96,7 @@ export default function Login() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@hirrdé.com"
+              placeholder="email@exemple.com"
               className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-lg px-4 py-3 text-[var(--color-text)] placeholder-[var(--color-muted)] focus:outline-none focus:border-[var(--color-gold)] transition-colors"
             />
           </div>

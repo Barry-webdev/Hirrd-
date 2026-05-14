@@ -9,11 +9,15 @@ import {
   Settings, 
   LogOut,
   FileBarChart2,
+  TrendingUp,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Sidebar() {
+  const { role } = useAuth();
+
   // Déconnexion Firebase
   const handleLogout = async () => {
     try {
@@ -23,16 +27,36 @@ export default function Sidebar() {
     }
   };
 
-  // Configuration des liens de navigation
-  const navLinks = [
-    { to: '/dashboard',    icon: LayoutDashboard, label: 'Tableau de bord' },
-    { to: '/events',       icon: CalendarDays,    label: 'Événements' },
-    { to: '/tickets',      icon: Ticket,          label: 'Billets' },
-    // { to: '/live-tracker', icon: Radio,           label: 'Suivi en direct' }, // Masqué - scan via app mobile
-    { to: '/report',       icon: FileBarChart2,   label: 'Rapports' },
-    { to: '/users',        icon: Users,           label: 'Utilisateurs' },
-    { to: '/settings',     icon: Settings,        label: 'Paramètres' },
-  ];
+  // Configuration des liens de navigation selon le rôle
+  const getNavLinks = () => {
+    // Propriétaire : uniquement son dashboard
+    if (role === 'owner') {
+      return [
+        { to: '/owner-dashboard', icon: TrendingUp, label: 'Mon événement' },
+        { to: '/settings',        icon: Settings,   label: 'Paramètres' },
+      ];
+    }
+
+    // Scanner : uniquement live tracker (mais masqué pour le moment)
+    if (role === 'scanner') {
+      return [
+        { to: '/settings', icon: Settings, label: 'Paramètres' },
+      ];
+    }
+
+    // Admin : accès complet
+    return [
+      { to: '/dashboard',    icon: LayoutDashboard, label: 'Tableau de bord' },
+      { to: '/events',       icon: CalendarDays,    label: 'Événements' },
+      { to: '/tickets',      icon: Ticket,          label: 'Billets' },
+      // { to: '/live-tracker', icon: Radio,           label: 'Suivi en direct' }, // Masqué - scan via app mobile
+      { to: '/report',       icon: FileBarChart2,   label: 'Rapports' },
+      { to: '/users',        icon: Users,           label: 'Utilisateurs' },
+      { to: '/settings',     icon: Settings,        label: 'Paramètres' },
+    ];
+  };
+
+  const navLinks = getNavLinks();
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col">

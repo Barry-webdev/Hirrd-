@@ -3,15 +3,16 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
 // Pages
-import Login        from './pages/Login';
-import Dashboard    from './pages/Dashboard';
-import Events       from './pages/Events';
-import EventDetail  from './pages/EventDetail';
-import Tickets      from './pages/Tickets';
-import LiveTracker  from './pages/LiveTracker';
-import Users        from './pages/Users';
-import Settings     from './pages/Settings';
-import Report       from './pages/Report';
+import Login          from './pages/Login';
+import Dashboard      from './pages/Dashboard';
+import Events         from './pages/Events';
+import EventDetail    from './pages/EventDetail';
+import Tickets        from './pages/Tickets';
+import LiveTracker    from './pages/LiveTracker';
+import Users          from './pages/Users';
+import Settings       from './pages/Settings';
+import Report         from './pages/Report';
+import OwnerDashboard from './pages/OwnerDashboard';
 // import MigrateUsers from './pages/MigrateUsers';
 
 // Layout protégé
@@ -55,16 +56,26 @@ export default function App() {
         >
           {/* Redirection par défaut vers /dashboard */}
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard"     element={<Dashboard />} />
-          <Route path="events"        element={<Events />} />
-          <Route path="events/:id"    element={<EventDetail />} />
-          <Route path="tickets"       element={<Tickets />} />
-          <Route path="live-tracker"  element={<LiveTracker />} />
-          <Route path="users"         element={<Users />} />
-          <Route path="settings"      element={<Settings />} />
-          <Route path="report"        element={<Report />} />
+          <Route path="dashboard"       element={<Dashboard />} />
+          <Route path="events"          element={<Events />} />
+          <Route path="events/:id"      element={<EventDetail />} />
+          <Route path="tickets"         element={<Tickets />} />
+          <Route path="live-tracker"    element={<LiveTracker />} />
+          <Route path="users"           element={<Users />} />
+          <Route path="settings"        element={<Settings />} />
+          <Route path="report"          element={<Report />} />
           {/* <Route path="migrate-users" element={<MigrateUsers />} /> */}
         </Route>
+
+        {/* Route propriétaire standalone (sans Layout/Sidebar) */}
+        <Route
+          path="/owner-dashboard"
+          element={
+            <ProtectedRoute>
+              <OwnerDashboard />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Toute route inconnue redirige vers /dashboard */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

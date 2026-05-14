@@ -24,9 +24,9 @@ export const getUserById = async (id) => {
 // Créer ou mettre à jour un profil utilisateur (utilisé après createAccount)
 export const setUserProfile = async (uid, data) => {
   // Validation du rôle
-  const validRoles = ['admin', 'scanner'];
+  const validRoles = ['admin', 'scanner', 'owner'];
   if (data.role && !validRoles.includes(data.role)) {
-    throw new Error('Rôle invalide. Utilisez "admin" ou "scanner".');
+    throw new Error('Rôle invalide. Utilisez "admin", "scanner" ou "owner".');
   }
   
   return setDoc(doc(db, COLLECTION, uid), {

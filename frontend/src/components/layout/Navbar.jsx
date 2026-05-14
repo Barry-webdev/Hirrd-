@@ -1,5 +1,8 @@
 // Barre de navigation supérieure — titre de page + infos utilisateur + toggle thème
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Sun, Moon } from 'lucide-react';
@@ -26,13 +29,37 @@ export default function Navbar() {
   const { user, role } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
+  const [userName, setUserName] = useState('');
+
+  // Récupérer le nom de l'utilisateur depuis Firestore
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUserName = async () => {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setUserName(userData.nom || user.email || 'Utilisateur');
+        } else {
+          setUserName(user.email || 'Utilisateur');
+        }
+      } catch (err) {
+        console.error('Erreur lors de la récupération du nom :', err);
+        setUserName(user.email || 'Utilisateur');
+      }
+    };
+
+    fetchUserName();
+  }, [user]);
+
   // Titre de la page courante (gère aussi /events/:id)
   const rawPath  = location.pathname;
   const basePath = rawPath.startsWith('/events/') ? '/events' : rawPath;
   const title    = PAGE_TITLES[basePath] ?? 'Hirrdé';
 
   // Initiales de l'utilisateur pour l'avatar
-  const displayName = user?.displayName ?? user?.email ?? 'Admin';
+  const displayName = userName || user?.email || 'Admin';
   const initials    = displayName
     .split(' ')
     .map((n) => n[0])

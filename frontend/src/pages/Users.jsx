@@ -14,10 +14,10 @@ import {
   Pencil, Trash2, AlertCircle, UserCheck,
 } from 'lucide-react';
 
-const ROLE_VARIANTS = { admin: 'gold', scanner: 'muted' };
-const ROLE_ICONS    = { admin: Shield, scanner: ScanLine };
+const ROLE_VARIANTS = { admin: 'gold', scanner: 'muted', owner: 'success' };
+const ROLE_ICONS    = { admin: Shield, scanner: ScanLine, owner: UserCheck };
 
-const FORM_INIT = { nom: '', email: '', password: '', role: 'scanner', eventAssigned: '', phoneNumber: '' };
+const FORM_INIT = { nom: '', email: '', password: '', role: 'scanner', eventAssigned: '', eventsAssigned: [], phoneNumber: '' };
 
 export default function Users() {
   const { role: currentRole } = useAuth();
@@ -68,12 +68,13 @@ export default function Users() {
     setEditTarget(u);
     setFormError('');
     setForm({
-      nom:           u.nom ?? '',
-      email:         u.email ?? '',
-      password:      '',
-      role:          u.role ?? 'scanner',
-      eventAssigned: u.eventAssigned ?? '',
-      phoneNumber:   u.phoneNumber ?? '',
+      nom:            u.nom ?? '',
+      email:          u.email ?? '',
+      password:       '',
+      role:           u.role ?? 'scanner',
+      eventAssigned:  u.eventAssigned ?? '',
+      eventsAssigned: u.eventsAssigned ?? [],
+      phoneNumber:    u.phoneNumber ?? '',
     });
     setModalOpen(true);
   };
@@ -107,6 +108,12 @@ export default function Users() {
       return;
     }
 
+    // Validation des événements assignés pour les propriétaires
+    if (form.role === 'owner' && form.eventsAssigned.length === 0) {
+      setFormError('Vous devez assigner au moins un événement au propriétaire.');
+      return;
+    }
+
     if (!editTarget && !form.password) {
       setFormError('Le mot de passe est obligatoire pour un nouveau compte.');
       return;
@@ -116,22 +123,46 @@ export default function Users() {
     try {
       if (editTarget) {
         // Mise à jour du profil uniquement (pas de changement d'email/password ici)
-        await updateUser(editTarget.id, {
-          nom:           form.nom.trim(),
-          role:          form.role,
-          eventAssigned: form.role === 'scanner' ? (form.eventAssigned || null) : null,
-          phoneNumber:   form.role === 'scanner' ? (form.phoneNumber.trim() || null) : null,
-        });
+        const updateData = {
+          nom:  form.nom.trim(),
+          role: form.role,
+        };
+
+        // Données spécifiques selon le rôle
+        if (form.role === 'scanner') {
+          updateData.eventAssigned = form.eventAssigned || null;
+          updateData.phoneNumber = form.phoneNumber.trim() || null;
+          updateData.eventsAssigned = null; // Nettoyer si changement de rôle
+        } else if (form.role === 'owner') {
+          updateData.eventsAssigned = form.eventsAssigned;
+          updateData.eventAssigned = null; // Nettoyer si changement de rôle
+          updateData.phoneNumber = null;
+        } else {
+          // Admin
+          updateData.eventAssigned = null;
+          updateData.eventsAssigned = null;
+          updateData.phoneNumber = null;
+        }
+
+        await updateUser(editTarget.id, updateData);
       } else {
         // Création du compte Firebase Auth + profil Firestore
         const cred = await createAccount(form.email.trim(), form.password);
-        await setUserProfile(cred.user.uid, {
-          nom:           form.nom.trim(),
-          email:         form.email.trim(),
-          role:          form.role,
-          eventAssigned: form.role === 'scanner' ? (form.eventAssigned || null) : null,
-          phoneNumber:   form.role === 'scanner' ? (form.phoneNumber.trim() || null) : null,
-        });
+        const profileData = {
+          nom:   form.nom.trim(),
+          email: form.email.trim(),
+          role:  form.role,
+        };
+
+        // Données spécifiques selon le rôle
+        if (form.role === 'scanner') {
+          profileData.eventAssigned = form.eventAssigned || null;
+          profileData.phoneNumber = form.phoneNumber.trim() || null;
+        } else if (form.role === 'owner') {
+          profileData.eventsAssigned = form.eventsAssigned;
+        }
+
+        await setUserProfile(cred.user.uid, profileData);
       }
       setModalOpen(false);
       await load();
@@ -164,6 +195,7 @@ export default function Users() {
 
   const admins   = users.filter((u) => u.role === 'admin');
   const scanners = users.filter((u) => u.role === 'scanner');
+  const owners   = users.filter((u) => u.role === 'owner');
 
   if (loading) {
     return (
@@ -188,7 +220,7 @@ export default function Users() {
         <div>
           <h1 className="text-2xl font-bold text-[var(--color-text)]">Utilisateurs</h1>
           <p className="text-[var(--color-muted)] text-sm mt-1">
-            {admins.length} admin{admins.length !== 1 ? 's' : ''} · {scanners.length} scanner{scanners.length !== 1 ? 's' : ''}
+            {admins.length} admin{admins.length !== 1 ? 's' : ''} · {owners.length} propriétaire{owners.length !== 1 ? 's' : ''} · {scanners.length} scanner{scanners.length !== 1 ? 's' : ''}
           </p>
         </div>
         {currentRole === 'admin' && (
@@ -224,7 +256,7 @@ export default function Users() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)]">
-                  {['Nom', 'Email', 'Rôle', 'Événement assigné', ''].map((h) => (
+                  {['Nom', 'Email / Téléphone', 'Rôle', 'Événement(s) assigné(s)', ''].map((h) => (
                     <th
                       key={h}
                       className="text-left px-6 py-3 text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider"
@@ -252,19 +284,35 @@ export default function Users() {
                         </div>
                       </td>
                       <td className="px-6 py-3 text-[var(--color-muted)] text-xs">
-                        {u.role === 'scanner' && u.phoneNumber ? u.phoneNumber : (u.email ?? '—')}
+                        {u.role === 'scanner' && u.phoneNumber 
+                          ? u.phoneNumber 
+                          : (u.email ?? '—')}
                       </td>
                       <td className="px-6 py-3">
                         <Badge variant={ROLE_VARIANTS[u.role] ?? 'muted'}>
                           <RoleIcon size={11} className="mr-1" />
-                          {u.role}
+                          {u.role === 'owner' ? 'propriétaire' : u.role}
                         </Badge>
                       </td>
                       <td className="px-6 py-3 text-[var(--color-muted)] text-xs">
-                        {u.role === 'scanner'
-                          ? (assignedEvent?.nom ?? (u.eventAssigned ? u.eventAssigned : '—'))
-                          : <span className="text-[var(--color-border)]">—</span>
-                        }
+                        {u.role === 'scanner' ? (
+                          assignedEvent?.nom ?? (u.eventAssigned ? u.eventAssigned : '—')
+                        ) : u.role === 'owner' ? (
+                          u.eventsAssigned && u.eventsAssigned.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {u.eventsAssigned.map((evId) => {
+                                const ev = events.find((e) => e.id === evId);
+                                return (
+                                  <Badge key={evId} variant="muted" className="text-xs">
+                                    {ev?.nom ?? evId}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          ) : '—'
+                        ) : (
+                          <span className="text-[var(--color-border)]">—</span>
+                        )}
                       </td>
                       <td className="px-6 py-3">
                         {currentRole === 'admin' && (
@@ -345,6 +393,7 @@ export default function Users() {
               className={inputCls}
             >
               <option value="scanner">Scanner</option>
+              <option value="owner">Propriétaire</option>
               <option value="admin">Admin</option>
             </select>
           </Field>
@@ -378,6 +427,37 @@ export default function Users() {
                 </select>
               </Field>
             </>
+          )}
+
+          {form.role === 'owner' && (
+            <Field label="Événements assignés *">
+              <div className="space-y-2 max-h-48 overflow-y-auto border border-[var(--color-border)] rounded-lg p-3">
+                {events.length === 0 ? (
+                  <p className="text-xs text-[var(--color-muted)]">Aucun événement disponible</p>
+                ) : (
+                  events.map((ev) => (
+                    <label key={ev.id} className="flex items-center gap-2 cursor-pointer hover:bg-[var(--color-bg)] p-2 rounded">
+                      <input
+                        type="checkbox"
+                        checked={form.eventsAssigned.includes(ev.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setField('eventsAssigned', [...form.eventsAssigned, ev.id]);
+                          } else {
+                            setField('eventsAssigned', form.eventsAssigned.filter((id) => id !== ev.id));
+                          }
+                        }}
+                        className="w-4 h-4 text-[var(--color-gold)] border-[var(--color-border)] rounded focus:ring-[var(--color-gold)]"
+                      />
+                      <span className="text-sm text-[var(--color-text)]">{ev.nom}</span>
+                    </label>
+                  ))
+                )}
+              </div>
+              <p className="text-xs text-[var(--color-muted)] mt-1">
+                Sélectionnez un ou plusieurs événements
+              </p>
+            </Field>
           )}
 
           {formError && (
