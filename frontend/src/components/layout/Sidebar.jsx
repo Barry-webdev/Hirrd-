@@ -62,9 +62,24 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 h-screen w-64 bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col">
       {/* Logo en haut */}
       <div className="p-6 border-b border-[var(--color-border)]">
-        <h1 className="text-2xl font-bold text-[var(--color-text)]">
-          Hirr<span className="text-[var(--color-gold)]">dé</span>
-        </h1>
+        <div className="flex items-center gap-3">
+          {/* Monogramme HR */}
+          <svg width="36" height="36" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="64" height="64" rx="10" fill="#0a0a0a"/>
+            <rect x="10" y="12" width="5" height="40" fill="#c9a84c"/>
+            <rect x="10" y="28" width="18" height="5" fill="#c9a84c"/>
+            <rect x="23" y="12" width="5" height="40" fill="#c9a84c"/>
+            <path d="M28 12 Q50 12 50 24 Q50 34 38 36 L50 52 L44 52 L33 37 L28 37 L28 52 Z" fill="#c9a84c"/>
+          </svg>
+          <div>
+            <h1 className="text-xl font-bold text-[var(--color-text)] leading-none tracking-widest uppercase">
+              Hirrdé
+            </h1>
+            <p className="text-[8px] text-[var(--color-gold)] tracking-[0.2em] uppercase mt-0.5">
+              Innover · Connecter · Élever
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Navigation principale */}
