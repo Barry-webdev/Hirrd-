@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { useAuth } from '../hooks/useAuth';
+import logo from '../assets/img/Hirrdé.png';
 
 export default function Login() {
   const navigate          = useNavigate();
@@ -66,11 +67,9 @@ export default function Login() {
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        {/* Titre */}
-        <div className="text-center mb-10">
-          <h1 className="text-5xl font-bold text-[var(--color-text)] mb-2">
-            Hirr<span className="text-[var(--color-gold)]">dé</span>
-          </h1>
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-10">
+          <img src={logo} alt="Hirrdé" className="h-16 w-auto mb-4" />
           <p className="text-[var(--color-muted)] text-sm">
             Connexion au système
           </p>
