@@ -36,6 +36,41 @@ export const setUserProfile = async (uid, data) => {
   });
 };
 
+// Créer un scanner directement dans Firestore (sans Firebase Auth)
+export const createScannerProfile = async (data) => {
+  const { nom, phoneNumber, pinCode, eventAssigned } = data;
+  
+  if (!nom || !phoneNumber || !pinCode) {
+    throw new Error('Le nom, le numéro de téléphone et le PIN sont requis.');
+  }
+  
+  // Vérifier si le numéro existe déjà
+  const { query: fsQuery, where, getDocs: fsGetDocs } = await import('firebase/firestore');
+  const q = fsQuery(
+    collection(db, COLLECTION),
+    where('phoneNumber', '==', phoneNumber),
+    where('role', '==', 'scanner')
+  );
+  const snapshot = await fsGetDocs(q);
+  
+  if (!snapshot.empty) {
+    throw new Error('Ce numéro de téléphone est déjà enregistré.');
+  }
+  
+  // Créer le document avec un ID auto-généré
+  const scannerRef = doc(collection(db, COLLECTION));
+  await setDoc(scannerRef, {
+    nom,
+    phoneNumber,
+    pinCode,
+    role: 'scanner',
+    eventAssigned: eventAssigned || null,
+    createdAt: serverTimestamp(),
+  });
+  
+  return { id: scannerRef.id, nom, phoneNumber, pinCode, role: 'scanner', eventAssigned };
+};
+
 // Créer un scanner avec numéro de téléphone (sans authentification Firebase)
 export const createScanner = async (data) => {
   const { phoneNumber, name } = data;
@@ -92,6 +127,14 @@ export const isScannerActive = (scanner) => {
 // Mettre à jour un utilisateur existant
 export const updateUser = async (id, data) =>
   updateDoc(doc(db, COLLECTION, id), data);
+
+// Réinitialiser le PIN d'un scanner
+export const resetScannerPIN = async (scannerId, newPIN) => {
+  await updateDoc(doc(db, COLLECTION, scannerId), {
+    pinCode: newPIN,
+  });
+  return newPIN;
+};
 
 // Supprimer un utilisateur
 export const deleteUser = async (id) =>

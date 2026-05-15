@@ -3,7 +3,8 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { createAccount } from '../firebase/auth';
-import { setUserProfile, updateUser, deleteUser } from '../firebase/users';
+import { setUserProfile, updateUser, deleteUser, resetScannerPIN, createScannerProfile } from '../firebase/users';
+import { generatePIN, generatePassword, copyToClipboard } from '../utils/pinGenerator';
 import { useAuth } from '../hooks/useAuth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -11,7 +12,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import {
   Plus, Users as UsersIcon, Shield, ScanLine,
-  Pencil, Trash2, AlertCircle, UserCheck,
+  Pencil, Trash2, AlertCircle, UserCheck, Eye, EyeOff, Copy, RefreshCw, Check,
 } from 'lucide-react';
 
 const ROLE_VARIANTS = { admin: 'gold', scanner: 'muted', owner: 'success' };
@@ -34,6 +35,15 @@ export default function Users() {
   const [formError,  setFormError]  = useState('');
   const [deleteId,   setDeleteId]   = useState(null);
   const [deleting,   setDeleting]   = useState(false);
+
+  // États pour affichage/copie des credentials
+  const [visibleCredentials, setVisibleCredentials] = useState({});
+  const [copiedCredentials, setCopiedCredentials] = useState({});
+  const [resettingPIN, setResettingPIN] = useState(null);
+
+  // Modal de succès après création
+  const [successModal, setSuccessModal] = useState(false);
+  const [createdUser, setCreatedUser] = useState(null);
 
   // Chargement
   const load = async () => {
@@ -92,20 +102,28 @@ export default function Users() {
       return;
     }
 
-    if (!form.nom.trim() || !form.email.trim()) {
-      setFormError('Nom et email sont obligatoires.');
+    if (!form.nom.trim()) {
+      setFormError('Le nom est obligatoire.');
       return;
     }
 
-    // Validation du numéro de téléphone pour les scanners
-    if (form.role === 'scanner' && !form.phoneNumber.trim()) {
-      setFormError('Le numéro de téléphone est obligatoire pour les scanners.');
-      return;
-    }
-
-    if (form.role === 'scanner' && !form.phoneNumber.startsWith('+')) {
-      setFormError('Le numéro doit être au format international (ex: +33612345678).');
-      return;
+    // Validation spécifique selon le rôle
+    if (form.role === 'scanner') {
+      // Scanner : téléphone obligatoire
+      if (!form.phoneNumber.trim()) {
+        setFormError('Le numéro de téléphone est obligatoire pour les scanners.');
+        return;
+      }
+      if (!form.phoneNumber.startsWith('+')) {
+        setFormError('Le numéro doit être au format international (ex: +224621234567).');
+        return;
+      }
+    } else {
+      // Admin et Owner : email obligatoire
+      if (!form.email.trim()) {
+        setFormError('L\'email est obligatoire.');
+        return;
+      }
     }
 
     // Validation des événements assignés pour les propriétaires
@@ -114,15 +132,16 @@ export default function Users() {
       return;
     }
 
-    if (!editTarget && !form.password) {
-      setFormError('Le mot de passe est obligatoire pour un nouveau compte.');
+    // Validation du mot de passe pour les admins
+    if (!editTarget && form.role === 'admin' && !form.password) {
+      setFormError('Le mot de passe est obligatoire pour un compte admin.');
       return;
     }
 
     setSubmitting(true);
     try {
       if (editTarget) {
-        // Mise à jour du profil uniquement (pas de changement d'email/password ici)
+        // Mise à jour du profil uniquement
         const updateData = {
           nom:  form.nom.trim(),
           role: form.role,
@@ -132,10 +151,11 @@ export default function Users() {
         if (form.role === 'scanner') {
           updateData.eventAssigned = form.eventAssigned || null;
           updateData.phoneNumber = form.phoneNumber.trim() || null;
-          updateData.eventsAssigned = null; // Nettoyer si changement de rôle
+          updateData.eventsAssigned = null;
+          updateData.email = null;
         } else if (form.role === 'owner') {
           updateData.eventsAssigned = form.eventsAssigned;
-          updateData.eventAssigned = null; // Nettoyer si changement de rôle
+          updateData.eventAssigned = null;
           updateData.phoneNumber = null;
         } else {
           // Admin
@@ -145,27 +165,60 @@ export default function Users() {
         }
 
         await updateUser(editTarget.id, updateData);
+        setModalOpen(false);
+        await load();
       } else {
-        // Création du compte Firebase Auth + profil Firestore
-        const cred = await createAccount(form.email.trim(), form.password);
-        const profileData = {
-          nom:   form.nom.trim(),
-          email: form.email.trim(),
-          role:  form.role,
-        };
-
-        // Données spécifiques selon le rôle
+        // Création d'un nouveau compte
         if (form.role === 'scanner') {
-          profileData.eventAssigned = form.eventAssigned || null;
-          profileData.phoneNumber = form.phoneNumber.trim() || null;
-        } else if (form.role === 'owner') {
-          profileData.eventsAssigned = form.eventsAssigned;
+          // Scanner : Créer directement dans Firestore (pas de Firebase Auth)
+          const pinCode = generatePIN();
+          const scannerData = await createScannerProfile({
+            nom: form.nom.trim(),
+            phoneNumber: form.phoneNumber.trim(),
+            pinCode,
+            eventAssigned: form.eventAssigned || null,
+          });
+
+          // Afficher la modale de succès
+          setCreatedUser({
+            ...scannerData,
+            generatedPassword: null,
+          });
+          setSuccessModal(true);
+        } else {
+          // Admin/Owner : Créer avec Firebase Auth
+          const generatedPassword = form.role === 'admin' 
+            ? form.password 
+            : generatePassword();
+          
+          const cred = await createAccount(form.email.trim(), generatedPassword);
+          
+          const profileData = {
+            nom:   form.nom.trim(),
+            email: form.email.trim(),
+            role:  form.role,
+          };
+
+          // Données spécifiques selon le rôle
+          if (form.role === 'owner') {
+            profileData.eventsAssigned = form.eventsAssigned;
+            profileData.password = generatedPassword;
+          }
+
+          await setUserProfile(cred.user.uid, profileData);
+
+          // Afficher la modale de succès
+          setCreatedUser({
+            ...profileData,
+            id: cred.user.uid,
+            generatedPassword: form.role === 'owner' ? generatedPassword : null,
+          });
+          setSuccessModal(true);
         }
 
-        await setUserProfile(cred.user.uid, profileData);
+        setModalOpen(false);
+        await load();
       }
-      setModalOpen(false);
-      await load();
     } catch (err) {
       const msgs = {
         'auth/email-already-in-use': 'Cet email est déjà utilisé.',
@@ -190,6 +243,44 @@ export default function Users() {
       console.error('Erreur suppression :', err);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // Toggle visibilité des credentials
+  const toggleVisibility = (userId) => {
+    setVisibleCredentials((prev) => ({
+      ...prev,
+      [userId]: !prev[userId],
+    }));
+  };
+
+  // Copier les credentials
+  const handleCopy = async (text, userId) => {
+    const success = await copyToClipboard(text);
+    if (success) {
+      setCopiedCredentials((prev) => ({ ...prev, [userId]: true }));
+      setTimeout(() => {
+        setCopiedCredentials((prev) => ({ ...prev, [userId]: false }));
+      }, 2000);
+    }
+  };
+
+  // Réinitialiser le PIN d'un scanner
+  const handleResetPIN = async (scannerId) => {
+    if (!window.confirm('Voulez-vous vraiment réinitialiser le code PIN de ce scanner ?')) {
+      return;
+    }
+    setResettingPIN(scannerId);
+    try {
+      const newPIN = generatePIN();
+      await resetScannerPIN(scannerId, newPIN);
+      await load();
+      alert(`Nouveau code PIN : ${newPIN}\n\nCommuniquez-le au scanner.`);
+    } catch (err) {
+      console.error('Erreur réinitialisation PIN :', err);
+      alert('Erreur lors de la réinitialisation du PIN');
+    } finally {
+      setResettingPIN(null);
     }
   };
 
@@ -256,7 +347,7 @@ export default function Users() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)]">
-                  {['Nom', 'Email / Téléphone', 'Rôle', 'Événement(s) assigné(s)', ''].map((h) => (
+                  {['Nom', 'Email / Téléphone', 'Rôle', 'Événement(s) assigné(s)', 'Identifiants', ''].map((h) => (
                     <th
                       key={h}
                       className="text-left px-6 py-3 text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider"
@@ -315,6 +406,59 @@ export default function Users() {
                         )}
                       </td>
                       <td className="px-6 py-3">
+                        {u.role === 'scanner' && u.pinCode ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-[var(--color-text)]">
+                              {visibleCredentials[u.id] ? u.pinCode : '••••••'}
+                            </span>
+                            <button
+                              onClick={() => toggleVisibility(u.id)}
+                              className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors"
+                              title={visibleCredentials[u.id] ? 'Masquer' : 'Afficher'}
+                            >
+                              {visibleCredentials[u.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleCopy(u.pinCode, u.id)}
+                              className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                              title="Copier"
+                            >
+                              {copiedCredentials[u.id] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleResetPIN(u.id)}
+                              disabled={resettingPIN === u.id}
+                              className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-warning)] hover:bg-[var(--color-bg)] transition-colors disabled:opacity-50"
+                              title="Réinitialiser PIN"
+                            >
+                              <RefreshCw size={14} className={resettingPIN === u.id ? 'animate-spin' : ''} />
+                            </button>
+                          </div>
+                        ) : u.role === 'owner' && u.password ? (
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs text-[var(--color-text)]">
+                              {visibleCredentials[u.id] ? u.password : '••••••••••••'}
+                            </span>
+                            <button
+                              onClick={() => toggleVisibility(u.id)}
+                              className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg)] transition-colors"
+                              title={visibleCredentials[u.id] ? 'Masquer' : 'Afficher'}
+                            >
+                              {visibleCredentials[u.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                            </button>
+                            <button
+                              onClick={() => handleCopy(u.password, u.id)}
+                              className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                              title="Copier"
+                            >
+                              {copiedCredentials[u.id] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[var(--color-border)] text-xs">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-3">
                         {currentRole === 'admin' && (
                           <div className="flex items-center gap-1">
                             <button
@@ -363,26 +507,51 @@ export default function Users() {
 
           {!editTarget && (
             <>
-              <Field label="Email *">
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setField('email', e.target.value)}
-                  placeholder="email@exemple.com"
-                  className={inputCls}
-                  required
-                />
-              </Field>
-              <Field label="Mot de passe *">
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => setField('password', e.target.value)}
-                  placeholder="6 caractères minimum"
-                  className={inputCls}
-                  required
-                />
-              </Field>
+              {/* Email uniquement pour admin et owner */}
+              {(form.role === 'admin' || form.role === 'owner') && (
+                <Field label="Email *">
+                  <input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setField('email', e.target.value)}
+                    placeholder="email@exemple.com"
+                    className={inputCls}
+                    required
+                  />
+                </Field>
+              )}
+              
+              {/* Mot de passe uniquement pour admin */}
+              {form.role === 'admin' && (
+                <Field label="Mot de passe *">
+                  <input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) => setField('password', e.target.value)}
+                    placeholder="6 caractères minimum"
+                    className={inputCls}
+                    required
+                  />
+                </Field>
+              )}
+
+              {/* Info pour owner : mot de passe auto-généré */}
+              {form.role === 'owner' && (
+                <div className="bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-[var(--color-text)]">
+                    🔐 Un mot de passe sécurisé sera généré automatiquement
+                  </p>
+                </div>
+              )}
+
+              {/* Info pour scanner : PIN auto-généré */}
+              {form.role === 'scanner' && (
+                <div className="bg-[var(--color-gold)]/10 border border-[var(--color-gold)]/20 rounded-lg px-3 py-2">
+                  <p className="text-xs text-[var(--color-text)]">
+                    🔐 Un code PIN à 6 chiffres sera généré automatiquement
+                  </p>
+                </div>
+              )}
             </>
           )}
 
@@ -488,6 +657,98 @@ export default function Users() {
           </Button>
           <Button variant="ghost" onClick={() => setDeleteId(null)}>Annuler</Button>
         </div>
+      </Modal>
+
+      {/* Modal succès création avec identifiants */}
+      <Modal isOpen={successModal} onClose={() => setSuccessModal(false)} title="✅ Utilisateur créé avec succès">
+        {createdUser && (
+          <div className="space-y-4">
+            <div className="bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 rounded-lg p-4">
+              <p className="text-sm font-medium text-[var(--color-text)] mb-3">
+                📋 Communiquez ces identifiants à l'utilisateur :
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <p className="text-xs text-[var(--color-muted)] mb-1">Nom</p>
+                  <p className="text-sm font-semibold text-[var(--color-text)]">{createdUser.nom}</p>
+                </div>
+
+                {createdUser.role === 'scanner' ? (
+                  <>
+                    <div>
+                      <p className="text-xs text-[var(--color-muted)] mb-1">Numéro de téléphone</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-mono font-semibold text-[var(--color-text)]">
+                          {createdUser.phoneNumber}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(createdUser.phoneNumber, 'modal')}
+                          className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                        >
+                          {copiedCredentials['modal'] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--color-muted)] mb-1">Code PIN</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-mono font-bold text-[var(--color-gold)]">
+                          {createdUser.pinCode}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(createdUser.pinCode, 'modal-pin')}
+                          className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                        >
+                          {copiedCredentials['modal-pin'] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : createdUser.role === 'owner' ? (
+                  <>
+                    <div>
+                      <p className="text-xs text-[var(--color-muted)] mb-1">Email</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-mono font-semibold text-[var(--color-text)]">
+                          {createdUser.email}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(createdUser.email, 'modal-email')}
+                          className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                        >
+                          {copiedCredentials['modal-email'] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-[var(--color-muted)] mb-1">Mot de passe</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-mono font-semibold text-[var(--color-gold)]">
+                          {createdUser.generatedPassword}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(createdUser.generatedPassword, 'modal-pwd')}
+                          className="p-1 rounded text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors"
+                        >
+                          {copiedCredentials['modal-pwd'] ? <Check size={14} className="text-[var(--color-success)]" /> : <Copy size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            <p className="text-xs text-[var(--color-muted)] text-center">
+              ⚠️ Notez ces informations, elles ne seront plus affichées
+            </p>
+
+            <Button onClick={() => setSuccessModal(false)} className="w-full justify-center">
+              J'ai noté les identifiants
+            </Button>
+          </div>
+        )}
       </Modal>
     </div>
   );
