@@ -4,11 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { useAuth } from '../hooks/useAuth';
-import logo from '../assets/img/Hirrdé.png';
 
 export default function Login() {
   const navigate          = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
@@ -16,9 +15,15 @@ export default function Login() {
   const [submitting, setSubmitting] = useState(false);
 
   // Redirection automatique si déjà connecté
-  if (!loading && user) {
-    // Redirection selon le rôle (sera géré par useAuth)
-    navigate('/dashboard', { replace: true });
+  if (!loading && user && role) {
+    // Redirection selon le rôle
+    if (role === 'owner') {
+      navigate('/owner-dashboard', { replace: true });
+    } else if (role === 'scanner') {
+      navigate('/settings', { replace: true });
+    } else {
+      navigate('/dashboard', { replace: true });
+    }
     return null;
   }
 
@@ -69,7 +74,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <img src={logo} alt="Hirrdé" className="h-16 w-auto mb-4" />
+          <img src="./scr/assets/images/logo.png" alt="Hirrdé" className="h-16 w-auto mb-4" />
           <p className="text-[var(--color-muted)] text-sm">
             Connexion au système
           </p>

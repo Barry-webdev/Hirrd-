@@ -54,8 +54,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          {/* Redirection par défaut vers /dashboard */}
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          {/* Route index qui redirige selon le rôle (géré par Layout.jsx) */}
+          <Route index element={<Dashboard />} />
           <Route path="dashboard"       element={<Dashboard />} />
           <Route path="events"          element={<Events />} />
           <Route path="events/:id"      element={<EventDetail />} />
@@ -77,8 +77,8 @@ export default function App() {
           }
         />
 
-        {/* Toute route inconnue redirige vers /dashboard */}
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Toute route inconnue redirige vers la page d'accueil */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );

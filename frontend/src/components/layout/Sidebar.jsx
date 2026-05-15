@@ -14,7 +14,6 @@ import {
 import { signOut } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 import { useAuth } from '../../hooks/useAuth';
-import logo from '../../assets/img/Hirrdé.png';
 
 export default function Sidebar() {
   const { role } = useAuth();
@@ -64,7 +63,7 @@ export default function Sidebar() {
       {/* Logo en haut */}
       <div className="p-6 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-3">
-          <img src={logo} alt="Hirrdé logo" className="h-10 w-auto" />
+          <img src="./src/assets/images/logo.png" alt="Hirrdé logo" className="h-10 w-auto" />
         </div>
       </div>
 

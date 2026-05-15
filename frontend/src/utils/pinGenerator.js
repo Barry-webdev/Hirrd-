@@ -13,7 +13,7 @@ export const generatePIN = () => {
  * @param {number} length - Longueur du mot de passe (défaut: 12)
  * @returns {string} Mot de passe aléatoire
  */
-export const generatePassword = (length = 6) => {
+export const generatePassword = (length = 12) => {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
   let password = '';
   for (let i = 0; i < length; i++) {
