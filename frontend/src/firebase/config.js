@@ -1,26 +1,24 @@
-// Configuration Firebase — remplace les valeurs par tes vraies credentials Firebase
+// Configuration Firebase — variables d'environnement Vite
 import { initializeApp } from 'firebase/app';
-import { getAnalytics } from "firebase/analytics";
-
+import { getAnalytics } from 'firebase/analytics';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBUVMhx3hOy66bIcHONsZrRqwbV_5lwCO0",
-  authDomain: "hirrde-pass.firebaseapp.com",
-  projectId: "hirrde-pass",
-  storageBucket: "hirrde-pass.firebasestorage.app",
-  messagingSenderId: "597549685708",
-  appId: "1:597549685708:web:417047a3e3b46c40f9db69",
-  measurementId: "G-8QRSTVKP0J"
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-const app     = initializeApp(firebaseConfig);
-const db      = getFirestore(app);
-const auth    = getAuth(app);
-const storage = getStorage(app);
+const app       = initializeApp(firebaseConfig);
+const db        = getFirestore(app);
+const auth      = getAuth(app);
+const storage   = getStorage(app);
 const analytics = getAnalytics(app);
 
-
-export { app, db, auth, storage };
+export { app, db, auth, storage, analytics };
