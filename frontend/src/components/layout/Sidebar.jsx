@@ -63,7 +63,7 @@ export default function Sidebar() {
       {/* Logo en haut */}
       <div className="p-6 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-3">
-          <img src="./src/assets/images/logo.png" alt="Hirrdé logo" className="h-10 w-auto" />
+          <img src="/images/logo.png" alt="Hirrdé logo" className="h-30 w-auto" />
         </div>
       </div>
 

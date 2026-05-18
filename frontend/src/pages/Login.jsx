@@ -74,7 +74,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <img src="./scr/assets/images/logo.png" alt="Hirrdé" className="h-16 w-auto mb-4" />
+          <img src="/images/logo.png" alt="Hirrdé" className="h-30 w-62 mb-4" />
           <p className="text-[var(--color-muted)] text-sm">
             Connexion au système
           </p>
