@@ -96,26 +96,38 @@ export default function EventDetail() {
     e.preventDefault();
     setGenError('');
     const qty = Number(genQty);
-    if (!qty || qty < 1 || qty > 100) {
-      setGenError('Quantité entre 1 et 100.');
+    if (!qty || qty < 1 || qty > 500) {
+      setGenError('Quantité entre 1 et 500.');
       return;
     }
     setGenerating(true);
     try {
+      // Créer tous les tickets en parallèle pour une génération ultra-rapide
+      const ticketPromises = [];
+      
       for (let i = 0; i < qty; i++) {
         const numeroUnique = generateSerial();
-        // On crée d'abord le doc pour obtenir l'ID, puis on met à jour qrCodeData
-        const ref = await createTicket({
+        
+        // Créer une promesse pour chaque ticket
+        const ticketPromise = createTicket({
           eventId:      id,
           numeroUnique,
           categorie:    genCat,
           prix:         event?.prix?.[genCat] ?? 0,
           qrCodeData:   '', // sera mis à jour juste après
+        }).then(async (ref) => {
+          // Une fois le ticket créé, mettre à jour le qrCodeData
+          const qrCodeData = generateQrCodeData(ref.id, id, numeroUnique);
+          await updateDoc(doc(db, 'tickets', ref.id), { qrCodeData });
+          return ref;
         });
-        const qrCodeData = generateQrCodeData(ref.id, id, numeroUnique);
-        // Mise à jour du qrCodeData avec l'ID réel
-        await updateDoc(doc(db, 'tickets', ref.id), { qrCodeData });
+        
+        ticketPromises.push(ticketPromise);
       }
+      
+      // Attendre que tous les tickets soient créés en parallèle
+      await Promise.all(ticketPromises);
+      
       setGenOpen(false);
       setGenQty(1);
     } catch (err) {
@@ -506,11 +518,11 @@ export default function EventDetail() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="block text-xs font-medium text-[var(--color-muted)]">Quantité (max 100)</label>
+            <label className="block text-xs font-medium text-[var(--color-muted)]">Quantité (max 500)</label>
             <input
               type="number"
               min="1"
-              max="100"
+              max="500"
               value={genQty}
               onChange={(e) => setGenQty(e.target.value)}
               className={inputCls}

@@ -3,9 +3,10 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { deleteTicket } from '../firebase/tickets';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { Search, CheckCircle, XCircle, AlertCircle, Ticket, ExternalLink } from 'lucide-react';
+import { Search, CheckCircle, XCircle, AlertCircle, Ticket, ExternalLink, Trash2 } from 'lucide-react';
 
 const CATEGORIES = ['tous', 'normal', 'prevente', 'vip', 'vvip'];
 const CAT_VARIANTS = { normal: 'muted', prevente: 'warning', vip: 'gold', vvip: 'success' };
@@ -20,6 +21,7 @@ export default function Tickets() {
   const [search,   setSearch]   = useState('');
   const [catFilter, setCatFilter] = useState('tous');
   const [usedFilter, setUsedFilter] = useState('tous'); // 'tous' | 'used' | 'unused'
+  const [deleting, setDeleting] = useState(null); // ID du ticket en cours de suppression
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -71,6 +73,24 @@ export default function Tickets() {
   const total  = tickets.length;
   const used   = tickets.filter((t) => t.used || t.status === 'validated').length;
   const unused = total - used;
+
+  // Fonction de suppression d'un ticket
+  const handleDeleteTicket = async (ticketId, ticketNumber) => {
+    if (!confirm(`Êtes-vous sûr de vouloir supprimer le billet ${ticketNumber} ?\n\nCette action est irréversible.`)) {
+      return;
+    }
+
+    setDeleting(ticketId);
+    try {
+      await deleteTicket(ticketId);
+      // Le listener onSnapshot mettra à jour la liste automatiquement
+    } catch (err) {
+      console.error('Erreur suppression ticket:', err);
+      alert('Erreur lors de la suppression du billet.');
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -181,7 +201,7 @@ export default function Tickets() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[var(--color-border)]">
-                  {['Numéro', 'Événement', 'Catégorie', 'Prix', 'Statut', ''].map((h) => (
+                  {['Numéro', 'Événement', 'Catégorie', 'Prix', 'Statut', 'Actions'].map((h) => (
                     <th
                       key={h}
                       className="text-left px-6 py-3 text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider"
@@ -225,13 +245,27 @@ export default function Tickets() {
                         )}
                       </td>
                       <td className="px-6 py-3">
-                        <Link
-                          to={`/events/${t.eventId}`}
-                          className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors inline-flex"
-                          aria-label="Voir l'événement"
-                        >
-                          <ExternalLink size={14} />
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={`/events/${t.eventId}`}
+                            className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-gold)] hover:bg-[var(--color-bg)] transition-colors inline-flex"
+                            aria-label="Voir l'événement"
+                          >
+                            <ExternalLink size={14} />
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteTicket(t.id, t.numeroUnique)}
+                            disabled={deleting === t.id}
+                            className="p-1.5 rounded-lg text-[var(--color-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger)]/10 transition-colors inline-flex disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Supprimer le billet"
+                          >
+                            {deleting === t.id ? (
+                              <div className="w-3.5 h-3.5 border border-[var(--color-danger)] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );

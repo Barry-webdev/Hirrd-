@@ -2,7 +2,7 @@
 // RÈGLE CRITIQUE : used = true est immuable — aucune mise à jour ne peut repasser used à false
 import {
   collection, doc, getDocs, getDoc,
-  addDoc, updateDoc,
+  addDoc, updateDoc, deleteDoc,
   query, where, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './config';
@@ -56,4 +56,24 @@ export const markTicketAsUsed = async (id, scannedBy) => {
     usedAt:    serverTimestamp(),
     scannedBy: scannedBy ?? null,
   });
+};
+
+// Supprimer un billet
+export const deleteTicket = async (id) => {
+  return deleteDoc(doc(db, COLLECTION, id));
+};
+
+// Supprimer tous les billets d'un événement (cascade delete)
+export const deleteTicketsByEvent = async (eventId) => {
+  const q = query(
+    collection(db, COLLECTION),
+    where('eventId', '==', eventId),
+  );
+  const snapshot = await getDocs(q);
+  
+  // Supprimer tous les tickets en parallèle
+  const deletePromises = snapshot.docs.map((d) => deleteDoc(d.ref));
+  await Promise.all(deletePromises);
+  
+  return snapshot.docs.length; // Retourne le nombre de tickets supprimés
 };

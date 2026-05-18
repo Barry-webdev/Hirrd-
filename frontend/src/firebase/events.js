@@ -35,6 +35,14 @@ export const createEvent = async (data) => {
 export const updateEvent = async (id, data) =>
   updateDoc(doc(db, COLLECTION, id), data);
 
-// Supprimer un événement
-export const deleteEvent = async (id) =>
-  deleteDoc(doc(db, COLLECTION, id));
+// Supprimer un événement et tous ses tickets associés (cascade delete)
+export const deleteEvent = async (id) => {
+  // Importer la fonction de suppression des tickets
+  const { deleteTicketsByEvent } = await import('./tickets');
+  
+  // Supprimer d'abord tous les tickets de l'événement
+  await deleteTicketsByEvent(id);
+  
+  // Puis supprimer l'événement
+  return deleteDoc(doc(db, COLLECTION, id));
+};
