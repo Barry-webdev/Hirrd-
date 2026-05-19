@@ -265,14 +265,14 @@ export default function Dashboard() {
                     <p className="text-sm text-[var(--color-text)] truncate font-medium">
                       {ev.nom ?? 'Sans nom'}
                     </p>
-                    <p className="text-xs text-[var(--color-muted)] mt-0.5 flex items-center gap-1">
-                      <Clock size={11} />
-                      {ev.date?.seconds
-                        ? new Date(ev.date.seconds * 1000).toLocaleDateString('fr-FR', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                          })
-                        : '—'}
-                    </p>
+                    {ev.date?.seconds && (
+                      <p className="text-xs text-[var(--color-muted)] mt-0.5 flex items-center gap-1">
+                        <Clock size={11} />
+                        {new Date(ev.date.seconds * 1000).toLocaleDateString('fr-FR', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                        })}
+                      </p>
+                    )}
                   </div>
                   <div className="ml-3 shrink-0">{statusBadge(ev.status)}</div>
                 </div>

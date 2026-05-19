@@ -75,8 +75,8 @@ export default function Events() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError('');
-    if (!form.nom.trim() || !form.date) {
-      setFormError('Le nom et la date sont obligatoires.');
+    if (!form.nom.trim()) {
+      setFormError('Le nom est obligatoire.');
       return;
     }
     setSubmitting(true);
@@ -87,7 +87,8 @@ export default function Events() {
         description: form.description.trim(),
         photoURL:    form.photoURL.trim(),
         status:      form.status,
-        date:        Timestamp.fromDate(new Date(form.date)),
+        // Date facultative : seulement si renseignée
+        ...(form.date ? { date: Timestamp.fromDate(new Date(form.date)) } : {}),
         prix: {
           normal:   Number(form.prix.normal)   || 0,
           prevente: Number(form.prix.prevente) || 0,
@@ -205,13 +206,12 @@ export default function Events() {
           </Field>
 
           {/* Date */}
-          <Field label="Date et heure *">
+          <Field label="Date et heure (facultatif)">
             <input
               type="datetime-local"
               value={form.date}
               onChange={(e) => setField('date', e.target.value)}
               className={inputCls}
-              required
             />
           </Field>
 
@@ -377,10 +377,12 @@ function EventCard({ event, onEdit, onDelete }) {
       </div>
 
       <div className="space-y-1.5 text-sm text-[var(--color-muted)]">
-        <p className="flex items-center gap-2">
-          <CalendarDays size={14} className="shrink-0" />
-          {dateStr}
-        </p>
+        {event.date?.seconds && (
+          <p className="flex items-center gap-2">
+            <CalendarDays size={14} className="shrink-0" />
+            {dateStr}
+          </p>
+        )}
         {event.lieu && (
           <p className="flex items-center gap-2">
             <MapPin size={14} className="shrink-0" />

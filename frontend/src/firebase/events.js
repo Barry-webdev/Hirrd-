@@ -8,9 +8,10 @@ import { db } from './config';
 
 const COLLECTION = 'events';
 
-// Récupérer tous les événements triés par date décroissante
+// Récupérer tous les événements triés par date de création décroissante
 export const getEvents = async () => {
-  const q = query(collection(db, COLLECTION), orderBy('date', 'desc'));
+  // On trie par createdAt au lieu de date pour inclure les événements sans date
+  const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
 };
